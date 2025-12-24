@@ -7,12 +7,14 @@
       </div>
 
       <!-- Profile Section -->
-      <ProfileSection
-        :profile="settings.profile"
-        :loading="saving"
-        @submit="handleUpdateProfile"
-        @cancel="handleCancel"
-      />
+      <div id="profile-section">
+        <ProfileSection
+          :profile="settings.profile"
+          :loading="saving"
+          @submit="handleUpdateProfile"
+          @cancel="handleCancel"
+        />
+      </div>
 
       <!-- Email Preferences -->
       <EmailPreferencesSection

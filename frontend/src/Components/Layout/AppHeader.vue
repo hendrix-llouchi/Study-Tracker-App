@@ -76,9 +76,9 @@
             class="absolute right-0 mt-2 w-48 bg-neutral-white border border-border-default rounded-lg shadow-lg py-1 z-50"
           >
             <router-link
-              to="/settings"
+              to="/settings#profile"
               class="flex items-center gap-2 px-4 py-2.5 text-body text-text-primary hover:bg-neutral-gray100 transition-colors duration-default min-h-[44px]"
-              @click="closeDropdown"
+              @click="handleProfileClick"
             >
               <User class="w-4 h-4" />
               Profile
@@ -153,6 +153,19 @@ const toggleDropdown = () => {
 
 const closeDropdown = () => {
   showDropdown.value = false
+}
+
+const handleProfileClick = () => {
+  closeDropdown()
+  // If already on settings page, scroll to profile section
+  if (route.path === '/settings') {
+    setTimeout(() => {
+      const profileSection = document.getElementById('profile-section')
+      if (profileSection) {
+        profileSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }, 100)
+  }
 }
 
 const handleLogout = () => {

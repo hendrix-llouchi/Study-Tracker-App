@@ -26,21 +26,21 @@
           Type <strong>{{ confirmationKeyword }}</strong> to confirm
         </p>
       </div>
-
-      <template #footer>
-        <div class="flex gap-3 justify-end">
-          <Button variant="ghost" @click="handleCancel">Cancel</Button>
-          <Button
-            variant="primary"
-            :disabled="requireConfirmation && confirmationText !== confirmationKeyword"
-            :loading="loading"
-            @click="handleConfirm"
-          >
-            {{ confirmText }}
-          </Button>
-        </div>
-      </template>
     </div>
+
+    <template #footer>
+      <div class="flex gap-3 justify-end">
+        <Button variant="ghost" @click="handleCancel">Cancel</Button>
+        <Button
+          variant="primary"
+          :disabled="requireConfirmation && confirmationText !== confirmationKeyword"
+          :loading="loading"
+          @click="handleConfirm"
+        >
+          {{ confirmText }}
+        </Button>
+      </div>
+    </template>
   </BaseModal>
 </template>
 
