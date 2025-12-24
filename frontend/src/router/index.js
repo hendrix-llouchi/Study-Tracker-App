@@ -121,8 +121,31 @@ const router = createRouter({
 
 // Router guard must be set up after Pinia is initialized
 export function setupRouterGuard() {
-  router.beforeEach((to, from, next) => {
-    // Bypass authentication for now - allow all navigation
+  router.beforeEach(async (to, from, next) => {
+    const authStore = useAuthStore()
+    
+    // If user is not loaded but token exists, try to fetch user
+    if (!authStore.user && authStore.token) {
+      try {
+        await authStore.fetchUser()
+      } catch (error) {
+        // Token is invalid, clear it
+        authStore.setToken(null)
+      }
+    }
+    
+    // Check if route requires authentication
+    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+      next({ name: 'Login', query: { redirect: to.fullPath } })
+      return
+    }
+    
+    // Check if route requires guest (not authenticated)
+    if (to.meta.requiresGuest && authStore.isAuthenticated) {
+      next({ name: 'Dashboard' })
+      return
+    }
+    
     next()
   })
 }
