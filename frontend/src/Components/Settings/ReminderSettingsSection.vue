@@ -31,10 +31,9 @@
         />
 
         <Select
-          v-model="form.channels"
+          v-model="channelsString"
           label="Notification Channels"
           :options="channelOptions"
-          @update:model-value="handleUpdate"
         />
 
         <Select
@@ -68,7 +67,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import Card from '@/Components/Common/Card.vue'
 import Input from '@/Components/Common/Input.vue'
 import Select from '@/Components/Common/Select.vue'
@@ -76,24 +75,54 @@ import Select from '@/Components/Common/Select.vue'
 const props = defineProps({
   settings: {
     type: Object,
-    required: true
+    required: false,
+    default: () => ({
+      eveningReminderTime: '21:00',
+      enabled: true,
+      channels: ['email'],
+      frequency: 'daily',
+      doNotDisturb: false
+    })
   }
 })
 
 const emit = defineEmits(['update'])
 
 const form = ref({
-  eveningReminderTime: props.settings.eveningReminderTime || '21:00',
-  enabled: props.settings.enabled !== false,
-  channels: props.settings.channels || ['email'],
-  frequency: props.settings.frequency || 'daily',
-  doNotDisturb: props.settings.doNotDisturb || false
+  eveningReminderTime: props.settings?.eveningReminderTime || '21:00',
+  enabled: props.settings?.enabled !== false,
+  channels: props.settings?.channels || ['email'],
+  frequency: props.settings?.frequency || 'daily',
+  doNotDisturb: props.settings?.doNotDisturb || false
+})
+
+// Map channel arrays to string identifiers
+const channelMap = {
+  'email-only': ['email'],
+  'push-only': ['push'],
+  'both': ['email', 'push']
+}
+
+// Convert channels array to string identifier for Select component
+const channelsString = computed({
+  get: () => {
+    const channels = form.value.channels || ['email']
+    const sortedChannels = [...channels].sort().join(',')
+    if (sortedChannels === 'email') return 'email-only'
+    if (sortedChannels === 'push') return 'push-only'
+    if (sortedChannels === 'email,push') return 'both'
+    return 'email-only' // default fallback
+  },
+  set: (value) => {
+    form.value.channels = channelMap[value] || ['email']
+    handleUpdate()
+  }
 })
 
 const channelOptions = [
-  { value: ['email'], label: 'Email Only' },
-  { value: ['push'], label: 'Push Only' },
-  { value: ['email', 'push'], label: 'Both Email & Push' }
+  { value: 'email-only', label: 'Email Only' },
+  { value: 'push-only', label: 'Push Only' },
+  { value: 'both', label: 'Both Email & Push' }
 ]
 
 const frequencyOptions = [
@@ -103,14 +132,16 @@ const frequencyOptions = [
 ]
 
 watch(() => props.settings, (newVal) => {
-  form.value = {
-    eveningReminderTime: newVal.eveningReminderTime || '21:00',
-    enabled: newVal.enabled !== false,
-    channels: newVal.channels || ['email'],
-    frequency: newVal.frequency || 'daily',
-    doNotDisturb: newVal.doNotDisturb || false
+  if (newVal) {
+    form.value = {
+      eveningReminderTime: newVal.eveningReminderTime || '21:00',
+      enabled: newVal.enabled !== false,
+      channels: newVal.channels || ['email'],
+      frequency: newVal.frequency || 'daily',
+      doNotDisturb: newVal.doNotDisturb || false
+    }
   }
-}, { deep: true })
+}, { deep: true, immediate: true })
 
 const handleUpdate = () => {
   emit('update', form.value)

@@ -69,27 +69,34 @@ import Button from '@/Components/Common/Button.vue'
 const props = defineProps({
   preferences: {
     type: Object,
-    required: true
+    required: false,
+    default: () => ({
+      morningEmailTime: '07:00',
+      enabled: true,
+      weeklyReports: true
+    })
   }
 })
 
 const emit = defineEmits(['update'])
 
 const form = ref({
-  morningEmailTime: props.preferences.morningEmailTime || '07:00',
-  enabled: props.preferences.enabled !== false,
-  weeklyReports: props.preferences.weeklyReports !== false
+  morningEmailTime: props.preferences?.morningEmailTime || '07:00',
+  enabled: props.preferences?.enabled !== false,
+  weeklyReports: props.preferences?.weeklyReports !== false
 })
 
 const showPreview = ref(false)
 
 watch(() => props.preferences, (newVal) => {
-  form.value = {
-    morningEmailTime: newVal.morningEmailTime || '07:00',
-    enabled: newVal.enabled !== false,
-    weeklyReports: newVal.weeklyReports !== false
+  if (newVal) {
+    form.value = {
+      morningEmailTime: newVal.morningEmailTime || '07:00',
+      enabled: newVal.enabled !== false,
+      weeklyReports: newVal.weeklyReports !== false
+    }
   }
-}, { deep: true })
+}, { deep: true, immediate: true })
 
 const handleUpdate = () => {
   emit('update', form.value)

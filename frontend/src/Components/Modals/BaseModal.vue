@@ -14,7 +14,7 @@
 
         <!-- Modal Container -->
         <div
-          class="relative bg-neutral-white rounded-2xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-hidden transform transition-all"
+          :class="containerClasses"
         >
           <!-- Close Button -->
           <button
@@ -48,6 +48,7 @@
 </template>
 
 <script setup>
+import { useAttrs, computed } from 'vue'
 import { X } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -67,6 +68,24 @@ const props = defineProps({
     type: Boolean,
     default: true
   }
+})
+
+defineOptions({
+  inheritAttrs: false
+})
+
+const attrs = useAttrs()
+
+const containerClasses = computed(() => {
+  let baseClasses = 'relative bg-neutral-white rounded-2xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-hidden transform transition-all'
+  const customClass = attrs.class ? String(attrs.class) : ''
+  
+  // If custom class contains a max-w utility, remove the default max-w-lg
+  if (customClass && /max-w-/.test(customClass)) {
+    baseClasses = baseClasses.replace('max-w-lg', '')
+  }
+  
+  return `${baseClasses} ${customClass}`.trim().replace(/\s+/g, ' ')
 })
 
 const emit = defineEmits(['update:modelValue', 'close'])

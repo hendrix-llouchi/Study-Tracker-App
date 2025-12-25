@@ -76,35 +76,47 @@ import Card from '@/Components/Common/Card.vue'
 const props = defineProps({
   notifications: {
     type: Object,
-    required: true
+    required: false,
+    default: () => ({
+      pushEnabled: true,
+      emailEnabled: true,
+      categories: {
+        assignments: true,
+        deadlines: true,
+        reminders: true,
+        reports: true
+      }
+    })
   }
 })
 
 const emit = defineEmits(['update'])
 
 const form = ref({
-  pushEnabled: props.notifications.pushEnabled !== false,
-  emailEnabled: props.notifications.emailEnabled !== false,
+  pushEnabled: props.notifications?.pushEnabled !== false,
+  emailEnabled: props.notifications?.emailEnabled !== false,
   categories: {
-    assignments: props.notifications.categories?.assignments !== false,
-    deadlines: props.notifications.categories?.deadlines !== false,
-    reminders: props.notifications.categories?.reminders !== false,
-    reports: props.notifications.categories?.reports !== false
+    assignments: props.notifications?.categories?.assignments !== false,
+    deadlines: props.notifications?.categories?.deadlines !== false,
+    reminders: props.notifications?.categories?.reminders !== false,
+    reports: props.notifications?.categories?.reports !== false
   }
 })
 
 watch(() => props.notifications, (newVal) => {
-  form.value = {
-    pushEnabled: newVal.pushEnabled !== false,
-    emailEnabled: newVal.emailEnabled !== false,
-    categories: {
-      assignments: newVal.categories?.assignments !== false,
-      deadlines: newVal.categories?.deadlines !== false,
-      reminders: newVal.categories?.reminders !== false,
-      reports: newVal.categories?.reports !== false
+  if (newVal) {
+    form.value = {
+      pushEnabled: newVal.pushEnabled !== false,
+      emailEnabled: newVal.emailEnabled !== false,
+      categories: {
+        assignments: newVal.categories?.assignments !== false,
+        deadlines: newVal.categories?.deadlines !== false,
+        reminders: newVal.categories?.reminders !== false,
+        reports: newVal.categories?.reports !== false
+      }
     }
   }
-}, { deep: true })
+}, { deep: true, immediate: true })
 
 const formatCategory = (category) => {
   const categories = {

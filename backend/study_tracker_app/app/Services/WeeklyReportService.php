@@ -45,7 +45,7 @@ class WeeklyReportService
             'performance_trend' => $report->performance_trend,
             'daily_breakdown' => $this->getDailyBreakdown($user, $weekStartDate, $weekEndDate),
             'ai_insights' => $report->ai_insights,
-            'generated_at' => $report->generated_at->toIso8601String(),
+            'generated_at' => ($report->generated_at ?? $report->created_at ?? now())->toIso8601String(),
         ];
     }
 
@@ -98,6 +98,12 @@ class WeeklyReportService
                 'ai_insights' => $this->generateAiInsights($user, $totalHours, $completionRate),
             ]
         );
+
+        // Set generated_at if the report was just created or if it's null (for existing records)
+        if ($report->wasRecentlyCreated || !$report->generated_at) {
+            $report->generated_at = now();
+            $report->save();
+        }
 
         return $report;
     }

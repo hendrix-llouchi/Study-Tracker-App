@@ -18,19 +18,19 @@
 
       <!-- Email Preferences -->
       <EmailPreferencesSection
-        :preferences="settings.emailPreferences"
+        :preferences="emailPreferences"
         @update="handleUpdateEmailPreferences"
       />
 
       <!-- Reminder Settings -->
       <ReminderSettingsSection
-        :settings="settings.reminderSettings"
+        :settings="reminderSettings"
         @update="handleUpdateReminderSettings"
       />
 
       <!-- Notification Preferences -->
       <NotificationPreferencesSection
-        :notifications="settings.notifications"
+        :notifications="notifications"
         @update="handleUpdateNotifications"
       />
 
@@ -58,6 +58,32 @@ const user = computed(() => authStore.user)
 const settings = computed(() => settingsStore.$state)
 const saving = ref(false)
 
+// Map preferences to component-expected structures
+const emailPreferences = computed(() => ({
+  morningEmailTime: settings.value.preferences?.morningEmailTime || '07:00',
+  enabled: settings.value.preferences?.emailNotifications !== false,
+  weeklyReports: settings.value.preferences?.weeklyReportEnabled !== false
+}))
+
+const reminderSettings = computed(() => ({
+  eveningReminderTime: settings.value.preferences?.reminderTime || '21:00',
+  enabled: settings.value.preferences?.emailNotifications !== false,
+  channels: settings.value.preferences?.emailNotifications ? ['email'] : [],
+  frequency: 'daily',
+  doNotDisturb: settings.value.preferences?.emailNotifications === false && settings.value.preferences?.pushNotifications === false
+}))
+
+const notifications = computed(() => ({
+  pushEnabled: settings.value.preferences?.pushNotifications !== false,
+  emailEnabled: settings.value.preferences?.emailNotifications !== false,
+  categories: {
+    assignments: true,
+    deadlines: true,
+    reminders: true,
+    reports: settings.value.preferences?.weeklyReportEnabled !== false
+  }
+}))
+
 onMounted(async () => {
   await settingsStore.fetchSettings()
 })
@@ -74,15 +100,27 @@ const handleUpdateProfile = async (profileData) => {
 }
 
 const handleUpdateEmailPreferences = async (preferences) => {
-  await settingsStore.updateEmailPreferences(preferences)
+  await settingsStore.updatePreferences({
+    morningEmailTime: preferences.morningEmailTime,
+    emailNotifications: preferences.enabled,
+    weeklyReportEnabled: preferences.weeklyReports
+  })
 }
 
-const handleUpdateReminderSettings = async (settings) => {
-  await settingsStore.updateReminderSettings(settings)
+const handleUpdateReminderSettings = async (reminderData) => {
+  await settingsStore.updatePreferences({
+    reminderTime: reminderData.eveningReminderTime,
+    emailNotifications: reminderData.enabled && reminderData.channels?.includes('email'),
+    pushNotifications: reminderData.enabled && reminderData.channels?.includes('push')
+  })
 }
 
-const handleUpdateNotifications = async (notifications) => {
-  await settingsStore.updateNotifications(notifications)
+const handleUpdateNotifications = async (notificationData) => {
+  await settingsStore.updatePreferences({
+    emailNotifications: notificationData.emailEnabled,
+    pushNotifications: notificationData.pushEnabled,
+    weeklyReportEnabled: notificationData.categories?.reports
+  })
 }
 
 const handleCancel = () => {

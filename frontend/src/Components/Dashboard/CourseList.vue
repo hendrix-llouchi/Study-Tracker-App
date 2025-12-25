@@ -11,7 +11,7 @@
           :key="course.id"
           class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg hover:bg-neutral-gray50 transition-colors duration-default cursor-pointer gap-3"
         >
-          <div class="flex items-center gap-3 flex-1 min-w-0">
+          <div class="flex items-center gap-3 flex-1 min-w-0 sm:min-w-[200px]">
             <div
               :class="courseIconClasses(course.color)"
               class="w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0"
@@ -23,8 +23,8 @@
               <p class="text-body-small text-text-secondary truncate">{{ course.code }} • {{ course.instructor }}</p>
             </div>
           </div>
-          <div class="flex items-center gap-4 justify-between sm:justify-end">
-            <ProgressBar :percentage="course.progress" :color="course.color" class="w-20 flex-shrink-0" />
+          <div class="flex items-center gap-3 justify-between sm:justify-end flex-shrink-0">
+            <ProgressBar :percentage="course.progress" :color="course.color" class="w-16 sm:w-20 flex-shrink-0" />
             <Button variant="icon" size="sm" class="flex-shrink-0">
               <ChevronRight :size="16" />
             </Button>

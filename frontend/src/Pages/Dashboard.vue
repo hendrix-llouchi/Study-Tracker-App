@@ -45,22 +45,18 @@
         <SubjectPerformanceChart :data="subjectPerformance" />
       </div>
 
-      <!-- Main Content Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+      <!-- Main Content Grid - Performance and Courses -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         <!-- Left Column - Performance Gauge -->
-        <div class="lg:col-span-1">
-          <PerformanceGauge :percentage="stats?.overallPerformance || 0" />
-        </div>
+        <PerformanceGauge :percentage="stats?.overallPerformance || 0" />
 
-        <!-- Middle Column - Course List -->
-        <div class="lg:col-span-1">
-          <CourseList />
-        </div>
+        <!-- Right Column - Course List -->
+        <CourseList />
+      </div>
 
-        <!-- Right Column - Upcoming Classes -->
-        <div class="lg:col-span-1">
-          <UpcomingClasses :classes="upcomingClasses" />
-        </div>
+      <!-- Upcoming Classes -->
+      <div class="grid grid-cols-1 gap-4 lg:gap-6">
+        <UpcomingClasses :classes="upcomingClasses" />
       </div>
 
       <!-- Bottom Row -->
