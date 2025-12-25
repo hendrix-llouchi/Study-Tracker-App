@@ -76,6 +76,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/Stores/auth'
 import { usePlanningStore } from '@/Stores/planning'
+import { getErrorMessage } from '@/utils/errorHandler'
 import api from '@/services/api'
 import AppLayout from '@/Components/Layout/AppLayout.vue'
 import Button from '@/Components/Common/Button.vue'
@@ -152,8 +153,9 @@ const handleSavePlan = async (planData) => {
     handleCloseModal()
     await planningStore.fetchPlans(selectedDate.value)
   } catch (error) {
+    const errorMessage = getErrorMessage(error)
     console.error('Failed to save plan:', error)
-    alert(error.message || 'Failed to save plan')
+    alert(errorMessage || 'Failed to save plan')
   }
 }
 

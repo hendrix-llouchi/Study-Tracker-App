@@ -66,6 +66,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/Stores/auth'
 import { usePerformanceStore } from '@/Stores/performance'
+import { getErrorMessage } from '@/utils/errorHandler'
 import api from '@/services/api'
 import AppLayout from '@/Components/Layout/AppLayout.vue'
 import Button from '@/Components/Common/Button.vue'
@@ -140,8 +141,9 @@ const handleBulkUpload = async (file) => {
     await performanceStore.bulkUpload(file)
     // Results will be automatically refreshed in the store
   } catch (error) {
+    const errorMessage = getErrorMessage(error)
     console.error('Bulk upload failed:', error)
-    alert(error.message || 'Failed to upload results. Please check the file format.')
+    alert(errorMessage || 'Failed to upload results. Please check the file format.')
   }
 }
 </script>

@@ -114,6 +114,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/Stores/auth'
 import { useTimetableStore } from '@/Stores/timetable'
+import { getErrorMessage } from '@/utils/errorHandler'
 import api from '@/services/api'
 import AppLayout from '@/Components/Layout/AppLayout.vue'
 import Button from '@/Components/Common/Button.vue'
@@ -192,8 +193,9 @@ const handleSaveClass = async (classData) => {
     handleCancelForm()
     await timetableStore.fetchClasses(currentSemester.value)
   } catch (error) {
+    const errorMessage = getErrorMessage(error)
     console.error('Failed to save class:', error)
-    alert(error.message || 'Failed to save class')
+    alert(errorMessage || 'Failed to save class')
   } finally {
     saving.value = false
   }
@@ -222,8 +224,9 @@ const handleFileUpload = async (event) => {
     await timetableStore.fetchClasses(currentSemester.value)
     showUploadModal.value = false
   } catch (error) {
+    const errorMessage = getErrorMessage(error)
     console.error('Failed to upload timetable:', error)
-    alert(error.message || 'Failed to upload timetable')
+    alert(errorMessage || 'Failed to upload timetable')
   } finally {
     uploading.value = false
     if (event.target) {

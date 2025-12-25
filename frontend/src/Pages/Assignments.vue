@@ -73,6 +73,7 @@
       <AssignmentModal
         v-model="showAssignmentModal"
         :assignment="editingAssignment"
+        :courses="courses"
         @save="handleSaveAssignment"
         @close="handleCloseModal"
       />
@@ -84,6 +85,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/Stores/auth'
 import { useAssignmentsStore } from '@/Stores/assignments'
+import api from '@/services/api'
 import AppLayout from '@/Components/Layout/AppLayout.vue'
 import Button from '@/Components/Common/Button.vue'
 import AssignmentsList from '@/Components/Assignments/AssignmentsList.vue'
@@ -106,15 +108,26 @@ const editingAssignment = ref(null)
 const assignments = computed(() => assignmentsStore.assignments)
 const filteredAssignments = computed(() => assignmentsStore.filteredAssignments)
 
-const courses = ref([
-  { id: 'cs201', name: 'Data Structures & Algorithms' },
-  { id: 'cs301', name: 'Database Systems' },
-  { id: 'cs302', name: 'Computer Networks' },
-  { id: 'cs303', name: 'Software Engineering' }
-])
+const courses = ref([])
+
+const fetchCourses = async () => {
+  try {
+    const response = await api.get('/courses')
+    if (response.success && response.data) {
+      courses.value = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.courses || response.data.data || [])
+    }
+  } catch (error) {
+    console.error('Failed to fetch courses:', error)
+  }
+}
 
 onMounted(async () => {
-  await assignmentsStore.fetchAssignments()
+  await Promise.all([
+    assignmentsStore.fetchAssignments(),
+    fetchCourses()
+  ])
 })
 
 const handleFilterChange = (filters) => {
