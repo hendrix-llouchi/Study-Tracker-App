@@ -1,17 +1,22 @@
 import { defineStore } from 'pinia'
+import api from '@/services/api'
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 export const useTimetableStore = defineStore('timetable', {
   state: () => ({
+    timetable: null,
     classes: [],
-    currentSemester: 'Fall 2024',
-    semesters: ['Fall 2024', 'Spring 2024', 'Fall 2023'],
-    studySlots: []
+    currentSemester: null,
+    semesters: [],
+    studySlots: [],
+    loading: false,
+    error: null
   }),
 
   getters: {
     weeklySchedule: (state) => {
-      const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-      return weekDays.map(day => ({
+      return DAY_NAMES.map(day => ({
         day,
         classes: state.classes.filter(c => c.day === day)
       }))
@@ -23,7 +28,6 @@ export const useTimetableStore = defineStore('timetable', {
         state.classes.slice(i + 1).forEach(class2 => {
           if (
             class1.day === class2.day &&
-            class1.semester === class2.semester &&
             hasTimeConflict(class1, class2)
           ) {
             conflicts.push({ class1, class2 })
@@ -35,109 +39,205 @@ export const useTimetableStore = defineStore('timetable', {
   },
 
   actions: {
-    async fetchClasses(semester) {
-      // Bypass API call - use mock data
-      if (this.classes.length === 0) {
-        this.loadMockData()
+    /**
+     * Map day_of_week (0-6) to day name
+     */
+    dayOfWeekToName(dayOfWeek) {
+      return DAY_NAMES[dayOfWeek] || 'Unknown'
+    },
+
+    /**
+     * Map day name to day_of_week (0-6)
+     */
+    dayNameToOfWeek(dayName) {
+      return DAY_NAMES.indexOf(dayName)
+    },
+
+    /**
+     * Transform backend class data to frontend format
+     */
+    transformClass(classData) {
+      return {
+        id: classData.id,
+        courseId: classData.course_id,
+        course: classData.course?.name || 'Unknown Course',
+        code: classData.course?.code || '',
+        day: this.dayOfWeekToName(classData.day_of_week),
+        dayOfWeek: classData.day_of_week,
+        startTime: classData.start_time,
+        endTime: classData.end_time,
+        location: classData.location || 'TBA',
+        instructor: classData.instructor || 'TBA',
+        classType: classData.class_type || 'lecture',
+        notes: classData.notes
       }
+    },
+
+    /**
+     * Transform frontend class data to backend format
+     */
+    transformClassForBackend(classData) {
+      return {
+        course_id: classData.courseId || classData.course_id,
+        day_of_week: classData.dayOfWeek !== undefined 
+          ? classData.dayOfWeek 
+          : this.dayNameToOfWeek(classData.day || classData.dayName),
+        start_time: classData.startTime || classData.start_time,
+        end_time: classData.endTime || classData.end_time,
+        location: classData.location || null,
+        instructor: classData.instructor || null,
+        class_type: classData.classType || classData.class_type || 'lecture'
+      }
+    },
+
+    async fetchClasses(semester) {
+      this.loading = true
+      this.error = null
       
       if (semester) {
         this.currentSemester = semester
       }
       
-      return this.classes.filter(c => c.semester === this.currentSemester)
-    },
-
-    loadMockData() {
-      this.classes = [
-        {
-          id: 'class_001',
-          course: 'Data Structures & Algorithms',
-          code: 'CS201',
-          day: 'Monday',
-          startTime: '09:00',
-          endTime: '10:30',
-          location: 'Room 301',
-          instructor: 'Dr. Sarah Johnson',
-          semester: 'Fall 2024',
-          color: 'orange'
-        },
-        {
-          id: 'class_002',
-          course: 'Data Structures & Algorithms',
-          code: 'CS201',
-          day: 'Wednesday',
-          startTime: '09:00',
-          endTime: '10:30',
-          location: 'Room 301',
-          instructor: 'Dr. Sarah Johnson',
-          semester: 'Fall 2024',
-          color: 'orange'
-        },
-        {
-          id: 'class_003',
-          course: 'Database Systems',
-          code: 'CS301',
-          day: 'Tuesday',
-          startTime: '14:00',
-          endTime: '15:30',
-          location: 'Room 205',
-          instructor: 'Prof. Michael Chen',
-          semester: 'Fall 2024',
-          color: 'blue'
-        },
-        {
-          id: 'class_004',
-          course: 'Database Systems',
-          code: 'CS301',
-          day: 'Thursday',
-          startTime: '14:00',
-          endTime: '15:30',
-          location: 'Room 205',
-          instructor: 'Prof. Michael Chen',
-          semester: 'Fall 2024',
-          color: 'blue'
-        },
-        {
-          id: 'class_005',
-          course: 'Computer Networks',
-          code: 'CS302',
-          day: 'Monday',
-          startTime: '11:00',
-          endTime: '12:30',
-          location: 'Room 102',
-          instructor: 'Dr. Emily Rodriguez',
-          semester: 'Fall 2024',
-          color: 'green'
+      try {
+        const params = this.currentSemester ? `?semester=${encodeURIComponent(this.currentSemester)}` : ''
+        const response = await api.get(`/timetable${params}`)
+        
+        if (response.success && response.data?.timetable) {
+          this.timetable = response.data.timetable
+          this.currentSemester = this.timetable.semester
+          this.classes = (this.timetable.classes || []).map(cls => this.transformClass(cls))
+          this.calculateStudySlots()
+        } else {
+          this.timetable = null
+          this.classes = []
+          this.studySlots = []
         }
-      ]
+        
+        return this.classes
+      } catch (error) {
+        console.error('Failed to fetch timetable:', error)
+        this.error = error.message || 'Failed to load timetable'
+        this.classes = []
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
-    async addClass(classData) {
-      const newClass = {
-        id: `class_${Date.now()}`,
-        ...classData,
-        semester: this.currentSemester
+    async createTimetable(timetableData) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const backendData = {
+          semester: timetableData.semester,
+          academic_year: timetableData.academicYear || timetableData.academic_year || null,
+          classes: timetableData.classes.map(cls => this.transformClassForBackend(cls))
+        }
+        
+        const response = await api.post('/timetable', backendData)
+        
+        if (response.success && response.data?.timetable) {
+          this.timetable = response.data.timetable
+          this.classes = (this.timetable.classes || []).map(cls => this.transformClass(cls))
+          this.currentSemester = this.timetable.semester
+          this.calculateStudySlots()
+          return this.timetable
+        }
+      } catch (error) {
+        console.error('Failed to create timetable:', error)
+        this.error = error.message || 'Failed to create timetable'
+        throw error
+      } finally {
+        this.loading = false
       }
-      this.classes.push(newClass)
-      this.calculateStudySlots()
-      return newClass
+    },
+
+    async uploadTimetable(file, semester) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('semester', semester)
+        
+        const response = await api.post('/timetable/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        if (response.success && response.data) {
+          return response.data
+        }
+      } catch (error) {
+        console.error('Failed to upload timetable:', error)
+        this.error = error.message || 'Failed to upload timetable'
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
     async updateClass(id, classData) {
-      const index = this.classes.findIndex(c => c.id === id)
-      if (index !== -1) {
-        this.classes[index] = { ...this.classes[index], ...classData }
-        this.calculateStudySlots()
-        return this.classes[index]
+      this.loading = true
+      this.error = null
+      
+      try {
+        const backendData = {
+          location: classData.location,
+          instructor: classData.instructor,
+          start_time: classData.startTime || classData.start_time,
+          end_time: classData.endTime || classData.end_time
+        }
+        
+        // Remove null/undefined values
+        Object.keys(backendData).forEach(key => {
+          if (backendData[key] === undefined || backendData[key] === null) {
+            delete backendData[key]
+          }
+        })
+        
+        const response = await api.put(`/timetable/classes/${id}`, backendData)
+        
+        if (response.success && response.data?.class) {
+          const transformedClass = this.transformClass(response.data.class)
+          const index = this.classes.findIndex(c => c.id === id)
+          if (index !== -1) {
+            this.classes[index] = transformedClass
+            this.calculateStudySlots()
+            return transformedClass
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update class:', error)
+        this.error = error.message || 'Failed to update class'
+        throw error
+      } finally {
+        this.loading = false
       }
-      return null
     },
 
     async deleteClass(id) {
-      this.classes = this.classes.filter(c => c.id !== id)
-      this.calculateStudySlots()
-      return true
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await api.delete(`/timetable/classes/${id}`)
+        
+        if (response.success) {
+          this.classes = this.classes.filter(c => c.id !== id)
+          this.calculateStudySlots()
+          return true
+        }
+      } catch (error) {
+        console.error('Failed to delete class:', error)
+        this.error = error.message || 'Failed to delete class'
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
     calculateStudySlots() {
@@ -146,7 +246,7 @@ export const useTimetableStore = defineStore('timetable', {
       
       weekDays.forEach(day => {
         const dayClasses = this.classes.filter(
-          c => c.day === day && c.semester === this.currentSemester
+          c => c.day === day
         ).sort((a, b) => a.startTime.localeCompare(b.startTime))
         
         // Find gaps between classes

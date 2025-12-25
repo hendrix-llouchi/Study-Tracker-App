@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import api from '@/services/api'
 
 export const useAssignmentsStore = defineStore('assignments', {
   state: () => ({
@@ -7,7 +8,9 @@ export const useAssignmentsStore = defineStore('assignments', {
       course: null,
       status: null,
       dueDate: null
-    }
+    },
+    loading: false,
+    error: null
   }),
 
   getters: {
@@ -61,109 +64,205 @@ export const useAssignmentsStore = defineStore('assignments', {
   },
 
   actions: {
-    async fetchAssignments() {
-      // Bypass API call - use mock data
-      if (this.assignments.length === 0) {
-        this.loadMockData()
+    /**
+     * Transform backend assignment data to frontend format
+     */
+    transformAssignment(assignment) {
+      const dueDate = assignment.due_date || assignment.dueDate
+      const dueDateStr = dueDate instanceof Date 
+        ? dueDate.toISOString().split('T')[0] 
+        : (typeof dueDate === 'string' ? dueDate.split('T')[0] : dueDate)
+      
+      return {
+        id: assignment.id,
+        courseId: assignment.course_id,
+        course: assignment.course?.name || 'Unknown Course',
+        title: assignment.title,
+        description: assignment.description,
+        dueDate: dueDateStr,
+        dueTime: assignment.due_date ? (new Date(assignment.due_date).toTimeString().slice(0, 5)) : null,
+        priority: assignment.priority || 'medium',
+        status: assignment.status || 'pending',
+        completed: assignment.status === 'completed',
+        completedAt: assignment.completed_at,
+        daysUntilDue: assignment.days_until_due,
+        notes: assignment.notes,
+        reminderSent: assignment.reminder_sent,
+        createdAt: assignment.created_at
       }
-      return this.assignments
     },
 
-    loadMockData() {
-      const today = new Date()
-      const nextWeek = new Date(today)
-      nextWeek.setDate(nextWeek.getDate() + 7)
-      const lastWeek = new Date(today)
-      lastWeek.setDate(lastWeek.getDate() - 7)
+    /**
+     * Transform frontend assignment data to backend format
+     */
+    transformAssignmentForBackend(assignmentData) {
+      const backendData = {
+        course_id: assignmentData.courseId || assignmentData.course_id,
+        title: assignmentData.title,
+        description: assignmentData.description || null,
+        priority: assignmentData.priority || 'medium',
+        notes: assignmentData.notes || null
+      }
 
-      this.assignments = [
-        {
-          id: 'assgn_001',
-          title: 'Database Design Project',
-          courseId: 'cs301',
-          course: 'Database Systems',
-          description: 'Design and implement a database schema for a library management system',
-          dueDate: nextWeek.toISOString().split('T')[0],
-          dueTime: '23:59',
-          priority: 'high',
-          completed: false,
-          createdAt: today.toISOString()
-        },
-        {
-          id: 'assgn_002',
-          title: 'Algorithm Analysis Assignment',
-          courseId: 'cs201',
-          course: 'Data Structures & Algorithms',
-          description: 'Analyze time complexity of sorting algorithms',
-          dueDate: today.toISOString().split('T')[0],
-          dueTime: '17:00',
-          priority: 'high',
-          completed: false,
-          createdAt: lastWeek.toISOString()
-        },
-        {
-          id: 'assgn_003',
-          title: 'Network Protocols Quiz',
-          courseId: 'cs302',
-          course: 'Computer Networks',
-          description: 'Online quiz on TCP/IP protocols',
-          dueDate: nextWeek.toISOString().split('T')[0],
-          dueTime: '14:00',
-          priority: 'medium',
-          completed: false,
-          createdAt: today.toISOString()
-        },
-        {
-          id: 'assgn_004',
-          title: 'Software Requirements Document',
-          courseId: 'cs303',
-          course: 'Software Engineering',
-          description: 'Write SRS document for assigned project',
-          dueDate: lastWeek.toISOString().split('T')[0],
-          dueTime: '23:59',
-          priority: 'high',
-          completed: true,
-          createdAt: lastWeek.toISOString()
+      // Handle due_date
+      if (assignmentData.dueDate) {
+        if (assignmentData.dueTime) {
+          backendData.due_date = `${assignmentData.dueDate} ${assignmentData.dueTime}:00`
+        } else {
+          backendData.due_date = `${assignmentData.dueDate} 23:59:59`
         }
-      ]
+      }
+
+      // Handle status
+      if (assignmentData.status) {
+        backendData.status = assignmentData.status
+      } else if (assignmentData.completed !== undefined) {
+        backendData.status = assignmentData.completed ? 'completed' : 'pending'
+      }
+
+      return backendData
+    },
+
+    async fetchAssignments() {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const params = new URLSearchParams()
+        
+        if (this.filters.status) {
+          params.append('status', this.filters.status)
+        }
+        
+        if (this.filters.course) {
+          params.append('course_id', this.filters.course)
+        }
+        
+        if (this.filters.status === 'upcoming') {
+          params.append('upcoming', 'true')
+        }
+        
+        const queryString = params.toString()
+        const url = `/assignments${queryString ? `?${queryString}` : ''}`
+        const response = await api.get(url)
+        
+        if (response.success && response.data?.assignments) {
+          this.assignments = response.data.assignments.map(assignment => 
+            this.transformAssignment(assignment)
+          )
+        }
+        
+        return this.assignments
+      } catch (error) {
+        console.error('Failed to fetch assignments:', error)
+        this.error = error.message || 'Failed to load assignments'
+        this.assignments = []
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
     async addAssignment(assignmentData) {
-      const assignment = {
-        id: `assgn_${Date.now()}`,
-        ...assignmentData,
-        completed: false,
-        createdAt: new Date().toISOString()
+      this.loading = true
+      this.error = null
+      
+      try {
+        const backendData = this.transformAssignmentForBackend(assignmentData)
+        const response = await api.post('/assignments', backendData)
+        
+        if (response.success && response.data?.assignment) {
+          const transformedAssignment = this.transformAssignment(response.data.assignment)
+          this.assignments.push(transformedAssignment)
+          return transformedAssignment
+        }
+      } catch (error) {
+        console.error('Failed to add assignment:', error)
+        this.error = error.message || 'Failed to create assignment'
+        throw error
+      } finally {
+        this.loading = false
       }
-      this.assignments.push(assignment)
-      return assignment
     },
 
     async updateAssignment(id, assignmentData) {
-      const index = this.assignments.findIndex(a => a.id === id)
-      if (index !== -1) {
-        this.assignments[index] = { ...this.assignments[index], ...assignmentData }
-        return this.assignments[index]
+      this.loading = true
+      this.error = null
+      
+      try {
+        const backendData = this.transformAssignmentForBackend(assignmentData)
+        const response = await api.put(`/assignments/${id}`, backendData)
+        
+        if (response.success && response.data?.assignment) {
+          const transformedAssignment = this.transformAssignment(response.data.assignment)
+          const index = this.assignments.findIndex(a => a.id === id)
+          if (index !== -1) {
+            this.assignments[index] = transformedAssignment
+            return transformedAssignment
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update assignment:', error)
+        this.error = error.message || 'Failed to update assignment'
+        throw error
+      } finally {
+        this.loading = false
       }
-      return null
     },
 
     async deleteAssignment(id) {
-      this.assignments = this.assignments.filter(a => a.id !== id)
-      return true
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await api.delete(`/assignments/${id}`)
+        
+        if (response.success) {
+          this.assignments = this.assignments.filter(a => a.id !== id)
+          return true
+        }
+      } catch (error) {
+        console.error('Failed to delete assignment:', error)
+        this.error = error.message || 'Failed to delete assignment'
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
     async toggleComplete(id) {
-      const assignment = this.assignments.find(a => a.id === id)
-      if (assignment) {
-        assignment.completed = !assignment.completed
-        return assignment
+      this.loading = true
+      this.error = null
+      
+      try {
+        const assignment = this.assignments.find(a => a.id === id)
+        if (!assignment) {
+          throw new Error('Assignment not found')
+        }
+        
+        const response = await api.patch(`/assignments/${id}/complete`)
+        
+        if (response.success && response.data?.assignment) {
+          const transformedAssignment = this.transformAssignment(response.data.assignment)
+          const index = this.assignments.findIndex(a => a.id === id)
+          if (index !== -1) {
+            this.assignments[index] = transformedAssignment
+            return transformedAssignment
+          }
+        }
+      } catch (error) {
+        console.error('Failed to toggle assignment completion:', error)
+        this.error = error.message || 'Failed to update assignment status'
+        throw error
+      } finally {
+        this.loading = false
       }
-      return null
     },
 
     updateFilters(newFilters) {
       this.filters = { ...this.filters, ...newFilters }
+      // Optionally refetch with new filters
+      // this.fetchAssignments()
     }
   }
 })

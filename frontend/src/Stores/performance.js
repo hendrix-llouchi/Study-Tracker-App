@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import api from '@/services/api'
 
 export const usePerformanceStore = defineStore('performance', {
   state: () => ({
@@ -8,116 +9,281 @@ export const usePerformanceStore = defineStore('performance', {
     filters: {
       semester: 'all',
       dateRange: null
-    }
+    },
+    loading: false,
+    error: null
   }),
 
   getters: {
     currentGPA: (state) => {
       if (state.results.length === 0) return 0
-      // Calculate GPA logic here
-      return 3.5
+      
+      // Calculate GPA from results
+      let totalPoints = 0
+      let totalCredits = 0
+      
+      state.results.forEach(result => {
+        const credits = result.creditHours || result.course?.credits || 3
+        const percentage = result.percentage || (result.score && result.maxScore ? (result.score / result.maxScore) * 100 : 0)
+        const gpaPoints = (percentage / 20) * credits // Convert percentage to 4.0 scale
+        totalPoints += gpaPoints
+        totalCredits += credits
+      })
+      
+      return totalCredits > 0 ? round(totalPoints / totalCredits, 2) : 0
     }
   },
 
   actions: {
-    async fetchResults() {
-      // Bypass API call - use mock data for now
-      if (this.results.length === 0) {
-        this.loadMockData()
-      }
+    /**
+     * Transform backend result data to frontend format
+     */
+    transformResult(result) {
       return {
-        results: this.results,
-        gpaTrend: this.gpaTrend,
-        subjectPerformance: this.subjectPerformance
+        id: result.id,
+        courseId: result.course_id,
+        course: result.course?.name || 'Unknown Course',
+        score: parseFloat(result.score) || 0,
+        maxScore: parseFloat(result.max_score) || 100,
+        percentage: parseFloat(result.percentage) || 0,
+        grade: result.grade,
+        creditHours: result.course?.credits || 3,
+        semester: result.semester,
+        assessmentType: result.assessment_type,
+        assessmentName: result.assessment_name,
+        weight: result.weight,
+        date: result.date,
+        notes: result.notes,
+        createdAt: result.created_at
       }
     },
 
-    loadMockData() {
-      this.results = [
-        {
-          id: 'res_001',
-          course: 'Data Structures & Algorithms',
-          score: 85,
-          maxScore: 100,
-          grade: 'B+',
-          creditHours: 3,
-          semester: 'Fall 2024',
-          assessmentType: 'final',
-          date: '2024-12-15'
-        },
-        {
-          id: 'res_002',
-          course: 'Database Systems',
-          score: 92,
-          maxScore: 100,
-          grade: 'A',
-          creditHours: 3,
-          semester: 'Fall 2024',
-          assessmentType: 'midterm',
-          date: '2024-11-20'
-        },
-        {
-          id: 'res_003',
-          course: 'Computer Networks',
-          score: 78,
-          maxScore: 100,
-          grade: 'C+',
-          creditHours: 3,
-          semester: 'Fall 2024',
-          assessmentType: 'final',
-          date: '2024-12-18'
-        },
-        {
-          id: 'res_004',
-          course: 'Software Engineering',
-          score: 94,
-          maxScore: 100,
-          grade: 'A',
-          creditHours: 3,
-          semester: 'Fall 2024',
-          assessmentType: 'project',
-          date: '2024-12-10'
+    /**
+     * Transform frontend result data to backend format
+     */
+    transformResultForBackend(resultData) {
+      return {
+        course_id: resultData.courseId || resultData.course_id,
+        assessment_type: resultData.assessmentType || resultData.assessment_type,
+        assessment_name: resultData.assessmentName || resultData.assessment_name || null,
+        score: parseFloat(resultData.score),
+        max_score: parseFloat(resultData.maxScore || resultData.max_score),
+        grade: resultData.grade || null,
+        weight: resultData.weight || null,
+        semester: resultData.semester,
+        date: resultData.date,
+        notes: resultData.notes || null
+      }
+    },
+
+    async fetchResults() {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const params = new URLSearchParams()
+        
+        if (this.filters.semester && this.filters.semester !== 'all') {
+          params.append('semester', this.filters.semester)
         }
-      ]
+        
+        if (this.filters.dateRange) {
+          if (this.filters.dateRange.from) {
+            params.append('from_date', this.filters.dateRange.from)
+          }
+          if (this.filters.dateRange.to) {
+            params.append('to_date', this.filters.dateRange.to)
+          }
+        }
+        
+        const queryString = params.toString()
+        const url = `/performance/results${queryString ? `?${queryString}` : ''}`
+        const response = await api.get(url)
+        
+        if (response.success && response.data?.results) {
+          this.results = response.data.results.map(result => this.transformResult(result))
+        }
+        
+        // Fetch GPA trend and subject performance
+        await Promise.all([
+          this.fetchGPATrend(),
+          this.fetchSubjectPerformance()
+        ])
+        
+        return {
+          results: this.results,
+          gpaTrend: this.gpaTrend,
+          subjectPerformance: this.subjectPerformance
+        }
+      } catch (error) {
+        console.error('Failed to fetch results:', error)
+        this.error = error.message || 'Failed to load academic results'
+        this.results = []
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchGPATrend(period = 'all') {
+      try {
+        const response = await api.get(`/performance/gpa-trend?period=${period}`)
+        
+        if (response.success && response.data?.trend) {
+          this.gpaTrend = response.data.trend.map(item => ({
+            period: item.period,
+            gpa: item.gpa || 0,
+            credits: item.credits || 0
+          }))
+        }
+      } catch (error) {
+        console.error('Failed to fetch GPA trend:', error)
+        this.gpaTrend = []
+      }
+    },
+
+    async fetchSubjectPerformance(semester = null) {
+      try {
+        const params = semester ? `?semester=${semester}` : ''
+        const response = await api.get(`/performance/subjects${params}`)
+        
+        if (response.success && response.data?.subjects) {
+          this.subjectPerformance = response.data.subjects.map(subject => ({
+            courseId: subject.course_id,
+            courseName: subject.course_name,
+            averageScore: subject.average_score || 0,
+            totalAssessments: subject.total_assessments || 0,
+            trend: subject.trend || 'stable'
+          }))
+        }
+      } catch (error) {
+        console.error('Failed to fetch subject performance:', error)
+        this.subjectPerformance = []
+      }
     },
 
     async addResult(data) {
-      // Bypass API call - just add to local state
-      const result = {
-        id: `res_${Date.now()}`,
-        ...data,
-        createdAt: new Date().toISOString()
+      this.loading = true
+      this.error = null
+      
+      try {
+        const backendData = this.transformResultForBackend(data)
+        const response = await api.post('/performance/results', backendData)
+        
+        if (response.success && response.data?.result) {
+          const transformedResult = this.transformResult(response.data.result)
+          this.results.push(transformedResult)
+          // Refresh GPA trend and subject performance
+          await Promise.all([
+            this.fetchGPATrend(),
+            this.fetchSubjectPerformance()
+          ])
+          return transformedResult
+        }
+      } catch (error) {
+        console.error('Failed to add result:', error)
+        this.error = error.message || 'Failed to add academic result'
+        throw error
+      } finally {
+        this.loading = false
       }
-      this.results.push(result)
-      return result
     },
 
     async updateResult(id, data) {
-      // Bypass API call - just update local state
-      const index = this.results.findIndex(r => r.id === id)
-      if (index !== -1) {
-        this.results[index] = { ...this.results[index], ...data }
-        return this.results[index]
+      this.loading = true
+      this.error = null
+      
+      try {
+        const backendData = this.transformResultForBackend(data)
+        const response = await api.put(`/performance/results/${id}`, backendData)
+        
+        if (response.success && response.data?.result) {
+          const transformedResult = this.transformResult(response.data.result)
+          const index = this.results.findIndex(r => r.id === id)
+          if (index !== -1) {
+            this.results[index] = transformedResult
+            // Refresh GPA trend and subject performance
+            await Promise.all([
+              this.fetchGPATrend(),
+              this.fetchSubjectPerformance()
+            ])
+            return transformedResult
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update result:', error)
+        this.error = error.message || 'Failed to update academic result'
+        throw error
+      } finally {
+        this.loading = false
       }
-      return null
     },
 
     async deleteResult(id) {
-      // Bypass API call - just remove from local state
-      this.results = this.results.filter(r => r.id !== id)
-      return true
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await api.delete(`/performance/results/${id}`)
+        
+        if (response.success) {
+          this.results = this.results.filter(r => r.id !== id)
+          // Refresh GPA trend and subject performance
+          await Promise.all([
+            this.fetchGPATrend(),
+            this.fetchSubjectPerformance()
+          ])
+          return true
+        }
+      } catch (error) {
+        console.error('Failed to delete result:', error)
+        this.error = error.message || 'Failed to delete academic result'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async bulkUpload(file) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const response = await api.post('/performance/results/bulk', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        if (response.success) {
+          // Refresh results after bulk upload
+          await this.fetchResults()
+          return response.data
+        }
+      } catch (error) {
+        console.error('Failed to bulk upload results:', error)
+        this.error = error.message || 'Failed to bulk upload results'
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
     calculateGPA() {
-      // GPA calculation logic
       return this.currentGPA
     },
 
-    updateFilters(newFilters) {
+    async updateFilters(newFilters) {
       this.filters = { ...this.filters, ...newFilters }
-      // In real implementation, this would trigger API call with filters
-      this.fetchResults()
+      await this.fetchResults()
     }
   }
 })
+
+function round(value, decimals) {
+  return Number(Math.round(value + 'e' + decimals) + 'e-' + decimals)
+}
 

@@ -4,14 +4,23 @@
     <div class="space-y-3">
       <div
         v-for="classItem in classes"
-        :key="classItem.id"
+        :key="`class-${classItem.id}-${classItem.thumbnail || 'no-thumb'}`"
         class="bg-neutral-gray50 rounded-xl p-4 flex flex-col sm:flex-row gap-3 cursor-pointer hover:bg-neutral-gray100 hover:transform hover:translate-x-1 transition-all duration-default"
       >
-        <img
-          :src="classItem.thumbnail || 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=100&h=75&fit=crop'"
-          :alt="classItem.courseName"
-          class="w-full sm:w-20 h-32 sm:h-15 rounded-lg object-cover flex-shrink-0"
-        />
+        <div class="w-full sm:w-20 h-32 sm:h-20 rounded-lg flex-shrink-0 bg-neutral-gray200 flex items-center justify-center overflow-hidden">
+          <img
+            v-if="hasValidThumbnail(classItem)"
+            :src="classItem.thumbnail"
+            :alt="classItem.courseName || 'Course'"
+            class="w-full h-full object-cover"
+            @error="handleImageError(classItem.id)"
+          />
+          <BookOpen
+            v-else
+            :size="24"
+            class="text-text-tertiary"
+          />
+        </div>
         <div class="flex-1 min-w-0 flex flex-col justify-between">
           <div>
             <p class="text-body font-semibold text-text-primary mb-1 truncate">
@@ -45,9 +54,10 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import Card from '@/Components/Common/Card.vue'
 import Button from '@/Components/Common/Button.vue'
-import { Clock } from 'lucide-vue-next'
+import { Clock, BookOpen } from 'lucide-vue-next'
 
 defineProps({
   classes: {
@@ -55,5 +65,20 @@ defineProps({
     default: () => []
   }
 })
+
+const imageErrors = ref({})
+
+const hasValidThumbnail = (classItem) => {
+  // Only show image if thumbnail exists and is a valid URL, and hasn't errored
+  if (!classItem.thumbnail) return false
+  if (typeof classItem.thumbnail !== 'string') return false
+  if (!classItem.thumbnail.startsWith('http') && !classItem.thumbnail.startsWith('/')) return false
+  if (imageErrors.value[classItem.id]) return false
+  return true
+}
+
+const handleImageError = (id) => {
+  imageErrors.value[id] = true
+}
 </script>
 

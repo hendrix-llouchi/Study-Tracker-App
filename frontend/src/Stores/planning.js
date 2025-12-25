@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import api from '@/services/api'
 
 export const usePlanningStore = defineStore('planning', {
   state: () => ({
@@ -9,7 +10,9 @@ export const usePlanningStore = defineStore('planning', {
       completionRate: 0,
       plannedHours: 0,
       actualHours: 0
-    }
+    },
+    loading: false,
+    error: null
   }),
 
   getters: {
@@ -44,119 +47,217 @@ export const usePlanningStore = defineStore('planning', {
   },
 
   actions: {
-    async fetchPlans(date) {
-      // Bypass API call - use mock data
-      if (this.plans.length === 0) {
-        this.loadMockData()
+    /**
+     * Transform backend plan data to frontend format
+     */
+    transformPlan(plan) {
+      return {
+        id: plan.id,
+        date: plan.date,
+        courseId: plan.course_id,
+        course: plan.course?.name || 'Unknown Course',
+        topic: plan.topic,
+        description: plan.description,
+        startTime: plan.start_time,
+        duration: plan.planned_duration,
+        actualTime: plan.actual_duration,
+        priority: plan.priority,
+        studyType: plan.study_type,
+        completed: plan.status === 'completed',
+        status: plan.status,
+        completedAt: plan.completed_at,
+        notes: plan.notes,
+        createdAt: plan.created_at
       }
+    },
+
+    /**
+     * Transform frontend plan data to backend format
+     */
+    transformPlanForBackend(planData) {
+      const backendData = {
+        topic: planData.topic,
+        description: planData.description || null,
+        date: planData.date,
+        start_time: planData.startTime,
+        planned_duration: planData.duration || planData.planned_duration,
+        priority: planData.priority,
+        study_type: planData.studyType || planData.study_type
+      }
+
+      if (planData.courseId) {
+        backendData.course_id = planData.courseId
+      }
+
+      return backendData
+    },
+
+    async fetchPlans(date) {
+      this.loading = true
+      this.error = null
       
       if (date) {
         this.selectedDate = date
       }
       
-      return this.plans
-    },
-
-    loadMockData() {
-      const today = new Date()
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      
-      this.plans = [
-        {
-          id: 'plan_001',
-          date: today.toISOString().split('T')[0],
-          courseId: 'cs201',
-          course: 'Data Structures & Algorithms',
-          topic: 'Binary Search Trees',
-          startTime: '09:00',
-          duration: 120,
-          priority: 'high',
-          studyType: 'new-material',
-          completed: true,
-          actualTime: 115,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'plan_002',
-          date: today.toISOString().split('T')[0],
-          courseId: 'cs301',
-          course: 'Database Systems',
-          topic: 'SQL Queries Review',
-          startTime: '14:00',
-          duration: 90,
-          priority: 'medium',
-          studyType: 'review',
-          completed: false,
-          actualTime: null,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'plan_003',
-          date: tomorrow.toISOString().split('T')[0],
-          courseId: 'cs302',
-          course: 'Computer Networks',
-          topic: 'TCP/IP Protocol',
-          startTime: '10:00',
-          duration: 120,
-          priority: 'high',
-          studyType: 'new-material',
-          completed: false,
-          actualTime: null,
-          createdAt: new Date().toISOString()
+      try {
+        const response = await api.get(`/planning/plans?date=${this.selectedDate}`)
+        
+        if (response.success && response.data?.plans) {
+          this.plans = response.data.plans.map(plan => this.transformPlan(plan))
+          this.calculateStatistics()
         }
-      ]
-      
-      this.calculateStatistics()
+        
+        return this.plans
+      } catch (error) {
+        console.error('Failed to fetch plans:', error)
+        this.error = error.message || 'Failed to load study plans'
+        this.plans = []
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
     async addPlan(planData) {
-      const plan = {
-        id: `plan_${Date.now()}`,
-        ...planData,
-        completed: false,
-        actualTime: null,
-        createdAt: new Date().toISOString()
+      this.loading = true
+      this.error = null
+      
+      try {
+        const backendData = this.transformPlanForBackend(planData)
+        const response = await api.post('/planning/plans', backendData)
+        
+        if (response.success && response.data?.plan) {
+          const transformedPlan = this.transformPlan(response.data.plan)
+          this.plans.push(transformedPlan)
+          this.calculateStatistics()
+          return transformedPlan
+        }
+      } catch (error) {
+        console.error('Failed to create plan:', error)
+        this.error = error.message || 'Failed to create study plan'
+        throw error
+      } finally {
+        this.loading = false
       }
-      this.plans.push(plan)
-      this.calculateStatistics()
-      return plan
     },
 
     async updatePlan(id, planData) {
-      const index = this.plans.findIndex(p => p.id === id)
-      if (index !== -1) {
-        this.plans[index] = { ...this.plans[index], ...planData }
-        this.calculateStatistics()
-        return this.plans[index]
+      this.loading = true
+      this.error = null
+      
+      try {
+        const backendData = this.transformPlanForBackend(planData)
+        const response = await api.put(`/planning/plans/${id}`, backendData)
+        
+        if (response.success && response.data?.plan) {
+          const transformedPlan = this.transformPlan(response.data.plan)
+          const index = this.plans.findIndex(p => p.id === id)
+          if (index !== -1) {
+            this.plans[index] = transformedPlan
+            this.calculateStatistics()
+            return transformedPlan
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update plan:', error)
+        this.error = error.message || 'Failed to update study plan'
+        throw error
+      } finally {
+        this.loading = false
       }
-      return null
     },
 
     async deletePlan(id) {
-      this.plans = this.plans.filter(p => p.id !== id)
-      this.calculateStatistics()
-      return true
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await api.delete(`/planning/plans/${id}`)
+        
+        if (response.success) {
+          this.plans = this.plans.filter(p => p.id !== id)
+          this.calculateStatistics()
+          return true
+        }
+      } catch (error) {
+        console.error('Failed to delete plan:', error)
+        this.error = error.message || 'Failed to delete study plan'
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
     async markComplete(id, actualTime = null) {
-      return this.updatePlan(id, {
-        completed: true,
-        actualTime: actualTime
-      })
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await api.patch(`/planning/plans/${id}/complete`, {
+          actual_duration: actualTime
+        })
+        
+        if (response.success && response.data?.plan) {
+          const transformedPlan = this.transformPlan(response.data.plan)
+          const index = this.plans.findIndex(p => p.id === id)
+          if (index !== -1) {
+            this.plans[index] = transformedPlan
+            this.calculateStatistics()
+            return transformedPlan
+          }
+        }
+      } catch (error) {
+        console.error('Failed to mark plan as complete:', error)
+        this.error = error.message || 'Failed to mark plan as complete'
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
 
     async carryOverPlans(fromDate, toDate) {
+      // Get incomplete plans from the fromDate
       const incomplete = this.plans.filter(
         p => p.date === fromDate && !p.completed
       )
       
-      incomplete.forEach(plan => {
-        plan.date = toDate
-        plan.carriedOver = true
-      })
+      // Update each plan's date
+      for (const plan of incomplete) {
+        try {
+          await this.updatePlan(plan.id, {
+            ...plan,
+            date: toDate,
+            startTime: plan.startTime,
+            duration: plan.duration
+          })
+        } catch (error) {
+          console.error(`Failed to carry over plan ${plan.id}:`, error)
+        }
+      }
+      
+      // Refresh plans for the new date
+      await this.fetchPlans(toDate)
       
       return incomplete.length
+    },
+
+    async checkConflicts(date, startTime, duration) {
+      try {
+        const response = await api.post('/planning/plans/check-conflicts', {
+          date,
+          start_time: startTime,
+          duration
+        })
+        
+        if (response.success && response.data) {
+          return response.data
+        }
+        return { has_conflicts: false, conflicts: [] }
+      } catch (error) {
+        console.error('Failed to check conflicts:', error)
+        return { has_conflicts: false, conflicts: [] }
+      }
     },
 
     calculateStatistics() {

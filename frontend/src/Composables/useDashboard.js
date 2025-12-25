@@ -1,18 +1,15 @@
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useDashboardStore } from '@/Stores/dashboard'
 
 export function useDashboard() {
   const dashboardStore = useDashboardStore()
-  const loading = ref(false)
   
   const loadDashboard = async () => {
-    loading.value = true
     try {
       await dashboardStore.fetchDashboardData()
     } catch (error) {
       console.error('Failed to load dashboard:', error)
-    } finally {
-      loading.value = false
+      throw error
     }
   }
   
@@ -26,7 +23,8 @@ export function useDashboard() {
     recentActivities: computed(() => dashboardStore.recentActivities),
     studyStreak: computed(() => dashboardStore.studyStreak),
     weeklyProgress: computed(() => dashboardStore.weeklyProgress),
-    loading,
+    loading: computed(() => dashboardStore.loading),
+    error: computed(() => dashboardStore.error),
     refresh: loadDashboard
   }
 }

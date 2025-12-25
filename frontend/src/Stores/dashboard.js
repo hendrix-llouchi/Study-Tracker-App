@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import api from '@/services/api'
 
 export const useDashboardStore = defineStore('dashboard', {
   state: () => ({
@@ -15,84 +16,333 @@ export const useDashboardStore = defineStore('dashboard', {
     gpaTrend: [],
     subjectPerformance: [],
     plannedVsCompleted: [],
-    heatmapData: []
+    heatmapData: [],
+    loading: false,
+    error: null
   }),
 
   actions: {
     async fetchDashboardData() {
-      // Bypass API call - always use mock data
-      this.loadMockData()
-      return {
-        stats: this.stats,
-        upcomingClasses: this.upcomingClasses,
-        recentActivities: this.recentActivities,
-        studyStreak: this.studyStreak,
-        weeklyProgress: this.weeklyProgress
+      this.loading = true
+      this.error = null
+      
+      try {
+        // Fetch all dashboard data in parallel
+        const [statsResponse, classesResponse, streakResponse, activitiesResponse] = await Promise.all([
+          api.get('/dashboard/stats'),
+          api.get('/dashboard/upcoming-classes'),
+          api.get('/dashboard/study-streak'),
+          api.get('/dashboard/activities')
+        ])
+
+        // Transform and set stats
+        if (statsResponse.success && statsResponse.data) {
+          this.stats = {
+            overallPerformance: statsResponse.data.overall_performance || 0,
+            coursesEnrolled: statsResponse.data.courses_enrolled || 0,
+            hoursStudied: statsResponse.data.hours_studied || 0,
+            completionRate: statsResponse.data.completion_rate || 0,
+            assignmentsDue: statsResponse.data.assignments_due || 0
+          }
+        }
+
+        // Transform and set upcoming classes
+        if (classesResponse.success && classesResponse.data?.classes) {
+          this.upcomingClasses = classesResponse.data.classes.map(cls => ({
+            id: cls.id,
+            courseName: cls.course_name || cls.course_code || 'Unknown Course',
+            instructor: cls.instructor || 'TBA',
+            time: `${cls.start_time || ''} - ${cls.end_time || ''}`,
+            date: cls.date,
+            location: cls.location || 'TBA',
+            isLive: false // Can be calculated based on current time
+          }))
+        }
+
+        // Transform and set study streak
+        if (streakResponse.success && streakResponse.data) {
+          this.studyStreak = {
+            current: streakResponse.data.current_streak || 0,
+            longest: streakResponse.data.longest_streak || 0,
+            days: this.transformStreakDays(streakResponse.data.days || [])
+          }
+        }
+
+        // Transform and set recent activities
+        if (activitiesResponse.success && activitiesResponse.data?.activities) {
+          this.recentActivities = activitiesResponse.data.activities.map(activity => ({
+            id: activity.id,
+            type: activity.type,
+            description: activity.description,
+            timestamp: activity.timestamp,
+            metadata: activity.metadata || {}
+          }))
+        }
+
+        // Fetch chart data
+        await Promise.all([
+          this.fetchGPATrend(),
+          this.fetchSubjectPerformance(),
+          this.fetchPlannedVsCompleted(),
+          this.fetchHeatmapData(),
+          this.fetchWeeklyProgress()
+        ])
+
+        return {
+          stats: this.stats,
+          upcomingClasses: this.upcomingClasses,
+          recentActivities: this.recentActivities,
+          studyStreak: this.studyStreak,
+          weeklyProgress: this.weeklyProgress
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error)
+        this.error = error.message || 'Failed to load dashboard data'
+        // Fallback to empty data instead of mock data
+        this.setEmptyData()
+        throw error
+      } finally {
+        this.loading = false
       }
     },
 
-    loadMockData() {
-      this.stats = {
-        overallPerformance: 85,
-        coursesEnrolled: 4,
-        hoursStudied: 156,
-        completionRate: 78,
-        assignmentsDue: 2
-      }
-      this.upcomingClasses = [
-        {
-          id: 'cls_001',
-          courseName: 'Data Structures & Algorithms',
-          instructor: 'Dr. Sarah Johnson',
-          time: '10:00 - 11:30',
-          date: '2024-12-23',
-          location: 'Room 301',
-          isLive: false
+    async fetchGPATrend() {
+      try {
+        const period = this.filters.period || 'all'
+        const response = await api.get(`/performance/gpa-trend?period=${period}`)
+        
+        if (response.success && response.data?.trend) {
+          this.gpaTrend = response.data.trend.map(item => ({
+            date: this.formatPeriodLabel(item.period),
+            gpa: item.gpa || 0
+          }))
         }
-      ]
-      this.studyStreak = {
-        current: 5,
-        longest: 12,
-        days: [
-          { day: 'Mon', active: true, completed: true },
-          { day: 'Tue', active: true, completed: true },
-          { day: 'Wed', active: true, completed: true },
-          { day: 'Thu', active: true, completed: true },
-          { day: 'Fri', active: true, completed: true },
-          { day: 'Sat', active: false, completed: false },
-          { day: 'Sun', active: false, completed: false }
-        ]
+      } catch (error) {
+        console.error('Failed to fetch GPA trend:', error)
+        this.gpaTrend = []
       }
-      this.weeklyProgress = [
-        { week: 'Week 1', completed: 12, planned: 15, missed: 3 },
-        { week: 'Week 2', completed: 14, planned: 16, missed: 2 }
-      ]
-      this.gpaTrend = [
-        { date: 'Jan', gpa: 3.2 },
-        { date: 'Feb', gpa: 3.4 },
-        { date: 'Mar', gpa: 3.5 },
-        { date: 'Apr', gpa: 3.6 },
-        { date: 'May', gpa: 3.7 },
-        { date: 'Jun', gpa: 3.8 }
-      ]
-      this.subjectPerformance = [
-        { subject: 'Data Structures', gpa: 3.8, score: 92, hours: 45 },
-        { subject: 'Database Systems', gpa: 3.6, score: 88, hours: 38 },
-        { subject: 'Computer Networks', gpa: 3.5, score: 85, hours: 42 },
-        { subject: 'Software Engineering', gpa: 3.9, score: 94, hours: 40 }
-      ]
-      this.plannedVsCompleted = [
-        { week: 'Week 1', planned: 20, completed: 18 },
-        { week: 'Week 2', planned: 22, completed: 20 },
-        { week: 'Week 3', planned: 18, completed: 15 },
-        { week: 'Week 4', planned: 24, completed: 22 },
-        { week: 'Week 5', planned: 20, completed: 19 }
-      ]
+    },
+
+    async fetchSubjectPerformance() {
+      try {
+        const semester = this.filters.semester || null
+        const params = semester ? `?semester=${semester}` : ''
+        const response = await api.get(`/performance/subjects${params}`)
+        
+        if (response.success && response.data?.subjects) {
+          // We need to get study hours for each subject
+          // For now, we'll use a placeholder or fetch from study plans
+          this.subjectPerformance = response.data.subjects.map(subject => ({
+            subject: subject.course_name || 'Unknown',
+            gpa: (subject.average_score || 0) / 20, // Convert percentage to GPA
+            score: subject.average_score || 0,
+            hours: 0 // Will be calculated from study plans if needed
+          }))
+        }
+      } catch (error) {
+        console.error('Failed to fetch subject performance:', error)
+        this.subjectPerformance = []
+      }
+    },
+
+    async fetchPlannedVsCompleted() {
+      try {
+        // Fetch study plans for last 5 weeks to calculate planned vs completed
+        const toDate = new Date()
+        const fromDate = new Date()
+        fromDate.setDate(fromDate.getDate() - 35) // ~5 weeks
+        
+        const response = await api.get(`/planning/plans?from_date=${fromDate.toISOString().split('T')[0]}&to_date=${toDate.toISOString().split('T')[0]}`)
+        
+        if (response.success && response.data?.plans) {
+          const plans = response.data.plans
+          
+          // Group by week
+          const weeklyData = {}
+          
+          plans.forEach(plan => {
+            const planDate = new Date(plan.date)
+            const weekStart = this.getWeekStart(planDate)
+            const weekKey = weekStart.toISOString().split('T')[0]
+            
+            if (!weeklyData[weekKey]) {
+              weeklyData[weekKey] = {
+                week: this.formatWeekLabel(weekStart),
+                planned: 0,
+                completed: 0
+              }
+            }
+            
+            const hours = (plan.planned_duration || 0) / 60
+            weeklyData[weekKey].planned += hours
+            
+            if (plan.status === 'completed') {
+              weeklyData[weekKey].completed += hours
+            }
+          })
+          
+          // Convert to array and sort by week key (date)
+          this.plannedVsCompleted = Object.entries(weeklyData)
+            .sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB))
+            .slice(-5) // Last 5 weeks
+            .map(([, data]) => data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch planned vs completed:', error)
+        this.plannedVsCompleted = []
+      }
+    },
+
+    async fetchHeatmapData() {
+      try {
+        // Fetch study plans for last year to generate heatmap
+        const toDate = new Date()
+        const fromDate = new Date()
+        fromDate.setFullYear(fromDate.getFullYear() - 1)
+        
+        const response = await api.get(`/planning/plans?from_date=${fromDate.toISOString().split('T')[0]}&to_date=${toDate.toISOString().split('T')[0]}`)
+        
+        if (response.success && response.data?.plans) {
+          const plans = response.data.plans
+          const heatmapMap = {}
+          
+          plans.forEach(plan => {
+            const date = plan.date
+            if (!heatmapMap[date]) {
+              heatmapMap[date] = 0
+            }
+            
+            // Use actual duration if completed, otherwise planned duration
+            const duration = plan.status === 'completed' 
+              ? (plan.actual_duration || plan.planned_duration || 0)
+              : (plan.planned_duration || 0)
+            
+            heatmapMap[date] += duration / 60 // Convert to hours
+          })
+          
+          // Convert to array format expected by heatmap component
+          this.heatmapData = Object.entries(heatmapMap).map(([date, value]) => ({
+            date,
+            value: Math.round(value * 10) / 10 // Round to 1 decimal
+          }))
+        }
+      } catch (error) {
+        console.error('Failed to fetch heatmap data:', error)
+        this.heatmapData = []
+      }
+    },
+
+    async fetchWeeklyProgress() {
+      try {
+        // Fetch study plans for last 4 weeks to calculate weekly progress
+        const toDate = new Date()
+        const fromDate = new Date()
+        fromDate.setDate(fromDate.getDate() - 28) // ~4 weeks
+        
+        const response = await api.get(`/planning/plans?from_date=${fromDate.toISOString().split('T')[0]}&to_date=${toDate.toISOString().split('T')[0]}`)
+        
+        if (response.success && response.data?.plans) {
+          const plans = response.data.plans
+          
+          // Group by week
+          const weeklyData = {}
+          
+          plans.forEach(plan => {
+            const planDate = new Date(plan.date)
+            const weekStart = this.getWeekStart(planDate)
+            const weekKey = weekStart.toISOString().split('T')[0]
+            
+            if (!weeklyData[weekKey]) {
+              weeklyData[weekKey] = {
+                week: this.formatWeekLabel(weekStart),
+                completed: 0,
+                planned: 0,
+                missed: 0
+              }
+            }
+            
+            const hours = (plan.planned_duration || 0) / 60
+            weeklyData[weekKey].planned += hours
+            
+            if (plan.status === 'completed') {
+              weeklyData[weekKey].completed += hours
+            } else if (plan.status === 'missed' || (plan.status !== 'pending' && new Date(plan.date) < new Date())) {
+              weeklyData[weekKey].missed += hours
+            }
+          })
+          
+          // Convert to array and sort by date
+          this.weeklyProgress = Object.entries(weeklyData)
+            .sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB))
+            .slice(-4) // Last 4 weeks
+            .map(([, data]) => data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch weekly progress:', error)
+        this.weeklyProgress = []
+      }
+    },
+
+    transformStreakDays(days) {
+      // Backend returns days with 'day' (e.g., 'Mon') and 'completed' boolean
+      // Frontend expects 'day', 'active', and 'completed'
+      return days.map(day => ({
+        day: day.day || day,
+        active: day.completed || false,
+        completed: day.completed || false
+      }))
+    },
+
+    formatPeriodLabel(period) {
+      // Format period string (e.g., "2024-01" or "Fall 2024") to short label
+      if (period.includes('-')) {
+        const [year, month] = period.split('-')
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        return monthNames[parseInt(month) - 1] || period
+      }
+      return period.length > 10 ? period.substring(0, 10) : period
+    },
+
+    formatWeekLabel(date) {
+      const now = new Date()
+      const startOfYear = new Date(now.getFullYear(), 0, 1)
+      const days = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000))
+      const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7)
+      return `Week ${weekNumber}`
+    },
+
+    getWeekStart(date) {
+      const d = new Date(date)
+      const day = d.getDay()
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1) // Adjust when day is Sunday
+      return new Date(d.setDate(diff))
+    },
+
+    setEmptyData() {
+      this.stats = {
+        overallPerformance: 0,
+        coursesEnrolled: 0,
+        hoursStudied: 0,
+        completionRate: 0,
+        assignmentsDue: 0
+      }
+      this.upcomingClasses = []
+      this.recentActivities = []
+      this.studyStreak = {
+        current: 0,
+        longest: 0,
+        days: []
+      }
+      this.weeklyProgress = []
+      this.gpaTrend = []
+      this.subjectPerformance = []
+      this.plannedVsCompleted = []
+      this.heatmapData = []
     },
 
     updateFilters(newFilters) {
       this.filters = { ...this.filters, ...newFilters }
-      // Trigger data refetch with filters (would call API in real implementation)
+      // Refetch data with new filters
       this.fetchDashboardData()
     },
 

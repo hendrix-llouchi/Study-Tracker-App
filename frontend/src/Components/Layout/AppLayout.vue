@@ -17,6 +17,8 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/Stores/auth'
 import Sidebar from '@/Components/Layout/Sidebar.vue'
 import AppHeader from '@/Components/Layout/AppHeader.vue'
 
@@ -31,11 +33,20 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['logout'])
-
+const router = useRouter()
+const authStore = useAuthStore()
 const isMobileMenuOpen = ref(false)
 
-const handleLogout = () => {
-  emit('logout')
+const handleLogout = async () => {
+  try {
+    await authStore.logout()
+    router.push('/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+    // Even if logout API call fails, clear local state and redirect
+    authStore.setUser(null)
+    authStore.setToken(null)
+    router.push('/login')
+  }
 }
 </script>
