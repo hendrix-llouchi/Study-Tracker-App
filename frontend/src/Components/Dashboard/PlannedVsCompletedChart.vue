@@ -2,8 +2,14 @@
   <Card padding="default">
     <h3 class="text-h3 text-text-primary mb-5">Planned vs Completed</h3>
     <div class="h-64 sm:h-80 relative">
+      <div v-if="!data || data.length === 0" class="flex items-center justify-center h-full">
+        <div class="text-center">
+          <p class="text-body text-text-secondary mb-2">No study plan data available</p>
+          <p class="text-body-small text-text-tertiary">Create study plans to see your planned vs completed hours</p>
+        </div>
+      </div>
       <Bar
-        v-if="chartData"
+        v-else
         :data="chartData"
         :options="chartOptions"
       />

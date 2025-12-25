@@ -54,6 +54,7 @@
       <ResultModal
         v-model="showResultModal"
         :result="editingResult"
+        :courses="courses"
         @save="handleSaveResult"
         @close="handleCloseModal"
       />
@@ -65,6 +66,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/Stores/auth'
 import { usePerformanceStore } from '@/Stores/performance'
+import api from '@/services/api'
 import AppLayout from '@/Components/Layout/AppLayout.vue'
 import Button from '@/Components/Common/Button.vue'
 import GPACalculator from '@/Components/Performance/GPACalculator.vue'
@@ -82,13 +84,31 @@ const performanceStore = usePerformanceStore()
 const user = computed(() => authStore.user)
 const results = computed(() => performanceStore.results)
 const currentSemester = ref('Fall 2024')
+const courses = ref([])
 
 const showResultModal = ref(false)
 const editingResult = ref(null)
 
 onMounted(async () => {
-  await performanceStore.fetchResults()
+  await Promise.all([
+    performanceStore.fetchResults(),
+    fetchCourses()
+  ])
 })
+
+const fetchCourses = async () => {
+  try {
+    const response = await api.get('/courses')
+    if (response.success && response.data) {
+      // Handle both array and paginated response
+      courses.value = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.courses || response.data.data || [])
+    }
+  } catch (error) {
+    console.error('Failed to fetch courses:', error)
+  }
+}
 
 const handleEditResult = (result) => {
   editingResult.value = result
@@ -116,8 +136,12 @@ const handleCloseModal = () => {
 }
 
 const handleBulkUpload = async (file) => {
-  console.log('Bulk upload:', file)
-  // In real implementation, this would parse the file and add results
-  alert('Bulk upload feature will be implemented in Phase 2')
+  try {
+    await performanceStore.bulkUpload(file)
+    // Results will be automatically refreshed in the store
+  } catch (error) {
+    console.error('Bulk upload failed:', error)
+    alert(error.message || 'Failed to upload results. Please check the file format.')
+  }
 }
 </script>

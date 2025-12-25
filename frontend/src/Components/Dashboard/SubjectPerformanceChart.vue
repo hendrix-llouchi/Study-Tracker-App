@@ -10,8 +10,14 @@
       />
     </div>
     <div class="h-64 sm:h-80 relative">
+      <div v-if="!data || data.length === 0" class="flex items-center justify-center h-full">
+        <div class="text-center">
+          <p class="text-body text-text-secondary mb-2">No subject performance data available</p>
+          <p class="text-body-small text-text-tertiary">Add academic results to see subject performance</p>
+        </div>
+      </div>
       <Bar
-        v-if="chartData"
+        v-else
         :data="chartData"
         :options="chartOptions"
       />

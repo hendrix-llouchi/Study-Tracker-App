@@ -10,7 +10,13 @@
       />
     </div>
     <div class="overflow-x-auto">
-      <div class="inline-block min-w-full">
+      <div v-if="heatmapData.length === 0" class="flex items-center justify-center py-12">
+        <div class="text-center">
+          <p class="text-body text-text-secondary mb-2">No study data available</p>
+          <p class="text-body-small text-text-tertiary">Create study plans to see your study consistency heatmap</p>
+        </div>
+      </div>
+      <div v-else class="inline-block min-w-full">
         <div class="grid grid-cols-53 gap-1 mb-2">
           <div
             v-for="day in days"
@@ -103,10 +109,14 @@ const generateHeatmapData = () => {
 }
 
 const heatmapData = computed(() => {
-  if (props.data.length > 0) {
-    return props.data
+  if (props.data && props.data.length > 0) {
+    // Ensure data has date and value properties
+    return props.data.map(item => ({
+      date: item.date,
+      value: item.value || 0
+    }))
   }
-  return generateHeatmapData()
+  return []
 })
 
 const getDayColor = (value) => {

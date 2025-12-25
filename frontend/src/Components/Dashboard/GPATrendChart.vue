@@ -10,8 +10,14 @@
       />
     </div>
     <div class="h-64 sm:h-80 relative">
+      <div v-if="!data || data.length === 0" class="flex items-center justify-center h-full">
+        <div class="text-center">
+          <p class="text-body text-text-secondary mb-2">No GPA data available</p>
+          <p class="text-body-small text-text-tertiary">Add academic results to see your GPA trend</p>
+        </div>
+      </div>
       <Line
-        v-if="chartData"
+        v-else
         :data="chartData"
         :options="chartOptions"
       />
@@ -20,7 +26,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -35,6 +41,7 @@ import {
 } from 'chart.js'
 import Card from '@/Components/Common/Card.vue'
 import Select from '@/Components/Common/Select.vue'
+import { useDashboardStore } from '@/Stores/dashboard'
 import { chartColors, getChartConfig } from '@/utils/charts'
 
 ChartJS.register(
@@ -55,33 +62,53 @@ const props = defineProps({
   }
 })
 
-const selectedPeriod = ref('semester')
+const dashboardStore = useDashboardStore()
+const selectedPeriod = ref('all')
 
 const periodOptions = [
-  { value: 'month', label: 'This Month' },
-  { value: 'semester', label: 'This Semester' },
+  { value: 'all', label: 'All Time' },
   { value: 'year', label: 'This Year' },
-  { value: 'all', label: 'All Time' }
+  { value: 'semester', label: 'This Semester' },
+  { value: 'month', label: 'This Month' }
 ]
 
+// Watch for period changes and refresh data
+watch(selectedPeriod, async (newPeriod) => {
+  await dashboardStore.refreshGPATrend(newPeriod)
+})
+
 const chartData = computed(() => {
-  const defaultData = [
-    { date: 'Jan', gpa: 3.2 },
-    { date: 'Feb', gpa: 3.4 },
-    { date: 'Mar', gpa: 3.5 },
-    { date: 'Apr', gpa: 3.6 },
-    { date: 'May', gpa: 3.7 },
-    { date: 'Jun', gpa: 3.8 }
-  ]
+  // Use props.data if available, otherwise show empty state
+  const data = props.data || []
   
-  const data = props.data.length > 0 ? props.data : defaultData
+  if (data.length === 0) {
+    return {
+      labels: [],
+      datasets: [
+        {
+          label: 'GPA',
+          data: [],
+          borderColor: chartColors.primary,
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: chartColors.primary,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2
+        }
+      ]
+    }
+  }
   
   return {
-    labels: data.map(d => d.date),
+    labels: data.map(d => d.date || d.period || ''),
     datasets: [
       {
         label: 'GPA',
-        data: data.map(d => d.gpa),
+        data: data.map(d => d.gpa || 0),
         borderColor: chartColors.primary,
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
         borderWidth: 3,

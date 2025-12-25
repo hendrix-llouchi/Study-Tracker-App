@@ -2,7 +2,13 @@
   <Card padding="default">
     <h3 class="text-h3 text-text-primary mb-5">Weekly Progress</h3>
     <div class="h-48 sm:h-60 relative mb-4">
-      <canvas ref="chartCanvas"></canvas>
+      <div v-if="!data || data.length === 0" class="flex items-center justify-center h-full">
+        <div class="text-center">
+          <p class="text-body text-text-secondary mb-2">No weekly progress data available</p>
+          <p class="text-body-small text-text-tertiary">Create study plans to track your weekly progress</p>
+        </div>
+      </div>
+      <canvas v-else ref="chartCanvas"></canvas>
     </div>
     <div class="flex gap-4 justify-center mt-4">
       <div class="flex items-center gap-2">
@@ -53,12 +59,11 @@ const drawChart = () => {
   canvas.width = width
   canvas.height = height
 
-  const data = props.data.length > 0 ? props.data : [
-    { week: 'Week 1', completed: 12, planned: 15, missed: 3 },
-    { week: 'Week 2', completed: 14, planned: 16, missed: 2 },
-    { week: 'Week 3', completed: 10, planned: 14, missed: 4 },
-    { week: 'Week 4', completed: 16, planned: 18, missed: 2 }
-  ]
+  const data = props.data || []
+  
+  if (data.length === 0) {
+    return
+  }
 
   const maxValue = Math.max(...data.flatMap(d => [d.completed, d.planned, d.missed]))
   const padding = 40

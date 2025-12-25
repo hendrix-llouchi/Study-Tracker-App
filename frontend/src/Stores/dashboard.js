@@ -130,13 +130,39 @@ export const useDashboardStore = defineStore('dashboard', {
         const response = await api.get(`/performance/subjects${params}`)
         
         if (response.success && response.data?.subjects) {
-          // We need to get study hours for each subject
-          // For now, we'll use a placeholder or fetch from study plans
+          // Fetch study hours from study plans for each course
+          const courseHoursMap = {}
+          
+          try {
+            // Get study plans for the last 30 days to calculate hours per course
+            const toDate = new Date()
+            const fromDate = new Date()
+            fromDate.setDate(fromDate.getDate() - 30)
+            
+            const plansResponse = await api.get(`/planning/plans?from_date=${fromDate.toISOString().split('T')[0]}&to_date=${toDate.toISOString().split('T')[0]}`)
+            
+            if (plansResponse.success && plansResponse.data?.plans) {
+              plansResponse.data.plans.forEach(plan => {
+                const courseId = plan.course_id
+                if (!courseHoursMap[courseId]) {
+                  courseHoursMap[courseId] = 0
+                }
+                // Use actual duration if completed, otherwise planned duration
+                const duration = plan.status === 'completed'
+                  ? (plan.actual_duration || plan.planned_duration || 0)
+                  : (plan.planned_duration || 0)
+                courseHoursMap[courseId] += duration / 60 // Convert to hours
+              })
+            }
+          } catch (error) {
+            console.warn('Failed to fetch study hours for subjects:', error)
+          }
+          
           this.subjectPerformance = response.data.subjects.map(subject => ({
             subject: subject.course_name || 'Unknown',
             gpa: (subject.average_score || 0) / 20, // Convert percentage to GPA
             score: subject.average_score || 0,
-            hours: 0 // Will be calculated from study plans if needed
+            hours: Math.round((courseHoursMap[subject.course_id] || 0) * 10) / 10 // Round to 1 decimal
           }))
         }
       } catch (error) {
@@ -340,10 +366,22 @@ export const useDashboardStore = defineStore('dashboard', {
       this.heatmapData = []
     },
 
-    updateFilters(newFilters) {
+    async updateFilters(newFilters) {
       this.filters = { ...this.filters, ...newFilters }
-      // Refetch data with new filters
-      this.fetchDashboardData()
+      // Refetch chart data that depends on filters
+      await Promise.all([
+        this.fetchGPATrend(),
+        this.fetchSubjectPerformance()
+      ])
+      // Note: We don't refetch all dashboard data to avoid unnecessary API calls
+      // Only chart data that depends on filters is refreshed
+    },
+
+    async refreshGPATrend(period) {
+      if (period) {
+        this.filters.period = period
+      }
+      await this.fetchGPATrend()
     },
 
     refreshStats() {
