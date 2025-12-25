@@ -14,8 +14,8 @@ class SendRemindersCommand extends Command
 
     public function handle(): void
     {
-        $currentHour = now()->format('H');
-        $currentMinute = now()->format('i');
+        $now = now();
+        $currentTime = $now->format('H:i');
 
         $users = User::whereHas('preferences', function ($query) {
             $query->where(function ($q) {
@@ -24,22 +24,35 @@ class SendRemindersCommand extends Command
             });
         })->with('preferences')->get();
 
+        $queuedCount = 0;
+
         foreach ($users as $user) {
             $preferences = $user->preferences;
             if (!$preferences) {
                 continue;
             }
 
-            $reminderTime = Carbon::parse($preferences->reminder_time);
-            $userHour = $reminderTime->format('H');
-            $userMinute = $reminderTime->format('i');
+            $reminderTime = Carbon::parse($preferences->reminder_time)->format('H:i');
+            
+            // Check if current time has passed the user's preferred reminder time
+            if ($currentTime < $reminderTime) {
+                continue;
+            }
 
-            if ($userHour == $currentHour && $userMinute <= $currentMinute) {
+            // Check if reminder was already sent today (prevent duplicates)
+            $alreadySent = \App\Models\EmailLog::where('user_id', $user->id)
+                ->where('email_type', 'reminder')
+                ->where('status', 'sent')
+                ->whereDate('sent_at', $now->toDateString())
+                ->exists();
+
+            if (!$alreadySent) {
                 SendReminderJob::dispatch($user);
+                $queuedCount++;
             }
         }
 
-        $this->info('Reminders queued successfully.');
+        $this->info("Reminders queued successfully. {$queuedCount} reminders queued.");
     }
 }
 

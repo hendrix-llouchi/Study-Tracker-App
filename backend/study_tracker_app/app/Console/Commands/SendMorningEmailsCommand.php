@@ -15,13 +15,15 @@ class SendMorningEmailsCommand extends Command
 
     public function handle(): void
     {
-        $currentHour = now()->format('H');
-        $currentMinute = now()->format('i');
+        $now = now();
+        $currentTime = $now->format('H:i');
 
         // Get users with email notifications enabled
         $users = User::whereHas('preferences', function ($query) {
             $query->where('email_notifications', true);
         })->with('preferences')->get();
+
+        $queuedCount = 0;
 
         foreach ($users as $user) {
             $preferences = $user->preferences;
@@ -29,17 +31,27 @@ class SendMorningEmailsCommand extends Command
                 continue;
             }
 
-            $emailTime = Carbon::parse($preferences->morning_email_time);
-            $userHour = $emailTime->format('H');
-            $userMinute = $emailTime->format('i');
+            $emailTime = Carbon::parse($preferences->morning_email_time)->format('H:i');
+            
+            // Check if current time has passed the user's preferred email time
+            if ($currentTime < $emailTime) {
+                continue;
+            }
 
-            // Check if it's time to send email (within current hour)
-            if ($userHour == $currentHour && $userMinute <= $currentMinute) {
+            // Check if email was already sent today (prevent duplicates)
+            $alreadySent = \App\Models\EmailLog::where('user_id', $user->id)
+                ->where('email_type', 'morning-plan')
+                ->where('status', 'sent')
+                ->whereDate('sent_at', $now->toDateString())
+                ->exists();
+
+            if (!$alreadySent) {
                 SendMorningEmailJob::dispatch($user);
+                $queuedCount++;
             }
         }
 
-        $this->info('Morning emails queued successfully.');
+        $this->info("Morning emails queued successfully. {$queuedCount} emails queued.");
     }
 }
 
