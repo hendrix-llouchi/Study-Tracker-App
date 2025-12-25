@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { getErrorMessage, formatErrorForLog } from '@/utils/errorHandler'
 
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
@@ -65,8 +66,9 @@ export const useSettingsStore = defineStore('settings', {
           preferences: this.preferences
         }
       } catch (error) {
-        console.error('Failed to fetch settings:', error)
-        this.error = error.message || 'Failed to load settings'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch settings', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -99,8 +101,9 @@ export const useSettingsStore = defineStore('settings', {
           return this.profile
         }
       } catch (error) {
-        console.error('Failed to update profile:', error)
-        this.error = error.message || 'Failed to update profile'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to update profile', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -126,8 +129,9 @@ export const useSettingsStore = defineStore('settings', {
           return this.profile.avatar_url
         }
       } catch (error) {
-        console.error('Failed to upload avatar:', error)
-        this.error = error.message || 'Failed to upload avatar'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to upload avatar', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -178,8 +182,9 @@ export const useSettingsStore = defineStore('settings', {
           return this.preferences
         }
       } catch (error) {
-        console.error('Failed to update preferences:', error)
-        this.error = error.message || 'Failed to update preferences'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to update preferences', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -201,8 +206,9 @@ export const useSettingsStore = defineStore('settings', {
           return true
         }
       } catch (error) {
-        console.error('Failed to change password:', error)
-        this.error = error.message || 'Failed to change password'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to change password', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -220,8 +226,9 @@ export const useSettingsStore = defineStore('settings', {
           return response.data
         }
       } catch (error) {
-        console.error('Failed to request data export:', error)
-        this.error = error.message || 'Failed to request data export'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to request data export', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -244,8 +251,9 @@ export const useSettingsStore = defineStore('settings', {
           return true
         }
       } catch (error) {
-        console.error('Failed to delete account:', error)
-        this.error = error.message || 'Failed to delete account'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to delete account', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false

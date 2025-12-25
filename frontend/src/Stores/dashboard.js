@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getErrorMessage, formatErrorForLog } from '@/utils/errorHandler'
 import api from '@/services/api'
 
 export const useDashboardStore = defineStore('dashboard', {
@@ -96,8 +97,9 @@ export const useDashboardStore = defineStore('dashboard', {
           weeklyProgress: this.weeklyProgress
         }
       } catch (error) {
-        console.error('Failed to fetch dashboard data:', error)
-        this.error = error.message || 'Failed to load dashboard data'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch dashboard data', error))
+        this.error = errorMessage
         // Fallback to empty data instead of mock data
         this.setEmptyData()
         throw error
@@ -118,7 +120,7 @@ export const useDashboardStore = defineStore('dashboard', {
           }))
         }
       } catch (error) {
-        console.error('Failed to fetch GPA trend:', error)
+        console.error(formatErrorForLog('Failed to fetch GPA trend', error))
         this.gpaTrend = []
       }
     },
@@ -155,7 +157,7 @@ export const useDashboardStore = defineStore('dashboard', {
               })
             }
           } catch (error) {
-            console.warn('Failed to fetch study hours for subjects:', error)
+            console.warn(formatErrorForLog('Failed to fetch study hours for subjects', error))
           }
           
           this.subjectPerformance = response.data.subjects.map(subject => ({
@@ -166,7 +168,7 @@ export const useDashboardStore = defineStore('dashboard', {
           }))
         }
       } catch (error) {
-        console.error('Failed to fetch subject performance:', error)
+        console.error(formatErrorForLog('Failed to fetch subject performance', error))
         this.subjectPerformance = []
       }
     },
@@ -214,7 +216,7 @@ export const useDashboardStore = defineStore('dashboard', {
             .map(([, data]) => data)
         }
       } catch (error) {
-        console.error('Failed to fetch planned vs completed:', error)
+        console.error(formatErrorForLog('Failed to fetch planned vs completed', error))
         this.plannedVsCompleted = []
       }
     },
@@ -253,7 +255,7 @@ export const useDashboardStore = defineStore('dashboard', {
           }))
         }
       } catch (error) {
-        console.error('Failed to fetch heatmap data:', error)
+        console.error(formatErrorForLog('Failed to fetch heatmap data', error))
         this.heatmapData = []
       }
     },
@@ -304,7 +306,7 @@ export const useDashboardStore = defineStore('dashboard', {
             .map(([, data]) => data)
         }
       } catch (error) {
-        console.error('Failed to fetch weekly progress:', error)
+        console.error(formatErrorForLog('Failed to fetch weekly progress', error))
         this.weeklyProgress = []
       }
     },

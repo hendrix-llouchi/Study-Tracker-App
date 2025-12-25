@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { getErrorMessage, formatErrorForLog } from '@/utils/errorHandler'
 
 export const usePlanningStore = defineStore('planning', {
   state: () => ({
@@ -110,8 +111,9 @@ export const usePlanningStore = defineStore('planning', {
         
         return this.plans
       } catch (error) {
-        console.error('Failed to fetch plans:', error)
-        this.error = error.message || 'Failed to load study plans'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch plans', error))
+        this.error = errorMessage
         this.plans = []
         throw error
       } finally {
@@ -134,8 +136,9 @@ export const usePlanningStore = defineStore('planning', {
           return transformedPlan
         }
       } catch (error) {
-        console.error('Failed to create plan:', error)
-        this.error = error.message || 'Failed to create study plan'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to create plan', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -160,8 +163,9 @@ export const usePlanningStore = defineStore('planning', {
           }
         }
       } catch (error) {
-        console.error('Failed to update plan:', error)
-        this.error = error.message || 'Failed to update study plan'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to update plan', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -181,8 +185,9 @@ export const usePlanningStore = defineStore('planning', {
           return true
         }
       } catch (error) {
-        console.error('Failed to delete plan:', error)
-        this.error = error.message || 'Failed to delete study plan'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to delete plan', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -208,8 +213,9 @@ export const usePlanningStore = defineStore('planning', {
           }
         }
       } catch (error) {
-        console.error('Failed to mark plan as complete:', error)
-        this.error = error.message || 'Failed to mark plan as complete'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to mark plan as complete', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -255,7 +261,7 @@ export const usePlanningStore = defineStore('planning', {
         }
         return { has_conflicts: false, conflicts: [] }
       } catch (error) {
-        console.error('Failed to check conflicts:', error)
+        console.error(formatErrorForLog('Failed to check conflicts', error))
         return { has_conflicts: false, conflicts: [] }
       }
     },

@@ -104,6 +104,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { usePlanningStore } from '@/Stores/planning'
+import { getErrorMessage, getValidationErrors } from '@/utils/errorHandler'
 import BaseModal from './BaseModal.vue'
 import Button from '@/Components/Common/Button.vue'
 import Input from '@/Components/Common/Input.vue'
@@ -303,9 +304,10 @@ const savePlan = async (createAnother) => {
       emit('update:modelValue', false)
     }
   } catch (err) {
-    error.value = err.message || 'Failed to create plan'
-    if (err.errors) {
-      errors.value = err.errors
+    error.value = getErrorMessage(err)
+    const validationErrors = getValidationErrors(err)
+    if (Object.keys(validationErrors).length > 0) {
+      errors.value = validationErrors
     }
   } finally {
     loading.value = false

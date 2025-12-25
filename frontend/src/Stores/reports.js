@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { getErrorMessage, formatErrorForLog } from '@/utils/errorHandler'
 
 export const useReportsStore = defineStore('reports', {
   state: () => ({
@@ -78,8 +79,9 @@ export const useReportsStore = defineStore('reports', {
           return transformedReport
         }
       } catch (error) {
-        console.error('Failed to fetch weekly report:', error)
-        this.error = error.message || 'Failed to load weekly report'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch weekly report', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -108,15 +110,16 @@ export const useReportsStore = defineStore('reports', {
             }
           } catch (error) {
             // If a week doesn't have a report, skip it
-            console.warn(`No report found for week ${weekStart}:`, error)
+            console.warn(formatErrorForLog(`No report found for week ${weekStart}`, error))
           }
         }
         
         this.reports = reports.sort((a, b) => new Date(b.week) - new Date(a.week))
         return this.reports
       } catch (error) {
-        console.error('Failed to fetch reports:', error)
-        this.error = error.message || 'Failed to load reports'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch reports', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -149,8 +152,9 @@ export const useReportsStore = defineStore('reports', {
           return transformedReport
         }
       } catch (error) {
-        console.error('Failed to generate weekly report:', error)
-        this.error = error.message || 'Failed to generate weekly report'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to generate weekly report', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -173,8 +177,9 @@ export const useReportsStore = defineStore('reports', {
           return response.data.analytics
         }
       } catch (error) {
-        console.error('Failed to fetch analytics:', error)
-        this.error = error.message || 'Failed to load analytics'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch analytics', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false

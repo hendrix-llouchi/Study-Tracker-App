@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { getErrorMessage, formatErrorForLog } from '@/utils/errorHandler'
 
 export const usePerformanceStore = defineStore('performance', {
   state: () => ({
@@ -116,8 +117,9 @@ export const usePerformanceStore = defineStore('performance', {
           subjectPerformance: this.subjectPerformance
         }
       } catch (error) {
-        console.error('Failed to fetch results:', error)
-        this.error = error.message || 'Failed to load academic results'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch results', error))
+        this.error = errorMessage
         this.results = []
         throw error
       } finally {
@@ -137,7 +139,7 @@ export const usePerformanceStore = defineStore('performance', {
           }))
         }
       } catch (error) {
-        console.error('Failed to fetch GPA trend:', error)
+        console.error(formatErrorForLog('Failed to fetch GPA trend', error))
         this.gpaTrend = []
       }
     },
@@ -157,7 +159,7 @@ export const usePerformanceStore = defineStore('performance', {
           }))
         }
       } catch (error) {
-        console.error('Failed to fetch subject performance:', error)
+        console.error(formatErrorForLog('Failed to fetch subject performance', error))
         this.subjectPerformance = []
       }
     },
@@ -181,8 +183,9 @@ export const usePerformanceStore = defineStore('performance', {
           return transformedResult
         }
       } catch (error) {
-        console.error('Failed to add result:', error)
-        this.error = error.message || 'Failed to add academic result'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to add result', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -211,8 +214,9 @@ export const usePerformanceStore = defineStore('performance', {
           }
         }
       } catch (error) {
-        console.error('Failed to update result:', error)
-        this.error = error.message || 'Failed to update academic result'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to update result', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -236,8 +240,9 @@ export const usePerformanceStore = defineStore('performance', {
           return true
         }
       } catch (error) {
-        console.error('Failed to delete result:', error)
-        this.error = error.message || 'Failed to delete academic result'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to delete result', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -264,8 +269,9 @@ export const usePerformanceStore = defineStore('performance', {
           return response.data
         }
       } catch (error) {
-        console.error('Failed to bulk upload results:', error)
-        this.error = error.message || 'Failed to bulk upload results'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to bulk upload results', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false

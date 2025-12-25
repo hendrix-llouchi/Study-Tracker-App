@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { getErrorMessage, formatErrorForLog } from '@/utils/errorHandler'
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -115,8 +116,9 @@ export const useTimetableStore = defineStore('timetable', {
         
         return this.classes
       } catch (error) {
-        console.error('Failed to fetch timetable:', error)
-        this.error = error.message || 'Failed to load timetable'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch timetable', error))
+        this.error = errorMessage
         this.classes = []
         throw error
       } finally {
@@ -145,8 +147,9 @@ export const useTimetableStore = defineStore('timetable', {
           return this.timetable
         }
       } catch (error) {
-        console.error('Failed to create timetable:', error)
-        this.error = error.message || 'Failed to create timetable'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to create timetable', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -172,8 +175,9 @@ export const useTimetableStore = defineStore('timetable', {
           return response.data
         }
       } catch (error) {
-        console.error('Failed to upload timetable:', error)
-        this.error = error.message || 'Failed to upload timetable'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to upload timetable', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -211,8 +215,9 @@ export const useTimetableStore = defineStore('timetable', {
           }
         }
       } catch (error) {
-        console.error('Failed to update class:', error)
-        this.error = error.message || 'Failed to update class'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to update class', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -253,8 +258,9 @@ export const useTimetableStore = defineStore('timetable', {
           return this.timetable
         }
       } catch (error) {
-        console.error('Failed to add class:', error)
-        this.error = error.message || 'Failed to add class'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to add class', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -274,8 +280,9 @@ export const useTimetableStore = defineStore('timetable', {
           return true
         }
       } catch (error) {
-        console.error('Failed to delete class:', error)
-        this.error = error.message || 'Failed to delete class'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to delete class', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false

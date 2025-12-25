@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { getErrorMessage, formatErrorForLog } from '@/utils/errorHandler'
 
 export const useAssignmentsStore = defineStore('assignments', {
   state: () => ({
@@ -154,8 +155,9 @@ export const useAssignmentsStore = defineStore('assignments', {
         
         return this.assignments
       } catch (error) {
-        console.error('Failed to fetch assignments:', error)
-        this.error = error.message || 'Failed to load assignments'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to fetch assignments', error))
+        this.error = errorMessage
         this.assignments = []
         throw error
       } finally {
@@ -177,8 +179,9 @@ export const useAssignmentsStore = defineStore('assignments', {
           return transformedAssignment
         }
       } catch (error) {
-        console.error('Failed to add assignment:', error)
-        this.error = error.message || 'Failed to create assignment'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to add assignment', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -202,8 +205,9 @@ export const useAssignmentsStore = defineStore('assignments', {
           }
         }
       } catch (error) {
-        console.error('Failed to update assignment:', error)
-        this.error = error.message || 'Failed to update assignment'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to update assignment', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -222,8 +226,9 @@ export const useAssignmentsStore = defineStore('assignments', {
           return true
         }
       } catch (error) {
-        console.error('Failed to delete assignment:', error)
-        this.error = error.message || 'Failed to delete assignment'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to delete assignment', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
@@ -251,8 +256,9 @@ export const useAssignmentsStore = defineStore('assignments', {
           }
         }
       } catch (error) {
-        console.error('Failed to toggle assignment completion:', error)
-        this.error = error.message || 'Failed to update assignment status'
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to toggle assignment completion', error))
+        this.error = errorMessage
         throw error
       } finally {
         this.loading = false
