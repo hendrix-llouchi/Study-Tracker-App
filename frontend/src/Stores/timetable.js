@@ -219,6 +219,48 @@ export const useTimetableStore = defineStore('timetable', {
       }
     },
 
+    async addClass(classData) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        // Get current timetable or create new one
+        if (!this.timetable) {
+          // Create new timetable with this class
+          const newClass = this.transformClassForBackend(classData)
+          const timetableData = {
+            semester: this.currentSemester || 'Fall 2024',
+            classes: [newClass]
+          }
+          return await this.createTimetable(timetableData)
+        }
+        
+        // Add class to existing timetable
+        const newClass = this.transformClassForBackend(classData)
+        const allClasses = this.classes.map(c => this.transformClassForBackend(c))
+        allClasses.push(newClass)
+        
+        const response = await api.post('/timetable', {
+          semester: this.timetable.semester,
+          academic_year: this.timetable.academic_year,
+          classes: allClasses
+        })
+        
+        if (response.success && response.data?.timetable) {
+          this.timetable = response.data.timetable
+          this.classes = (this.timetable.classes || []).map(cls => this.transformClass(cls))
+          this.calculateStudySlots()
+          return this.timetable
+        }
+      } catch (error) {
+        console.error('Failed to add class:', error)
+        this.error = error.message || 'Failed to add class'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     async deleteClass(id) {
       this.loading = true
       this.error = null

@@ -13,6 +13,14 @@
             @update:model-value="handleSemesterChange"
           />
           <Button
+            variant="secondary"
+            size="lg"
+            @click="showUploadModal = true"
+          >
+            <Upload :size="20" class="mr-2" />
+            Upload
+          </Button>
+          <Button
             variant="primary"
             size="lg"
             @click="showClassForm = true"
@@ -56,11 +64,47 @@
       >
         <ClassEntryForm
           :class-item="editingClass"
+          :courses="courses"
           :existing-classes="semesterClasses"
           :loading="saving"
           @submit="handleSaveClass"
           @cancel="handleCancelForm"
         />
+      </BaseModal>
+
+      <!-- Upload Modal -->
+      <BaseModal
+        v-model="showUploadModal"
+        title="Upload Timetable"
+      >
+        <div class="space-y-4">
+          <p class="text-body text-text-secondary">
+            Upload an image or PDF of your timetable. We'll extract the schedule automatically.
+          </p>
+          <input
+            :ref="el => fileInput = el"
+            type="file"
+            accept="image/*,.pdf"
+            class="hidden"
+            @change="handleFileUpload"
+          />
+          <div
+            @click="fileInput?.click()"
+            class="border-2 border-dashed border-border-medium rounded-lg p-8 text-center cursor-pointer hover:border-primary-green transition-colors"
+          >
+            <Upload :size="48" class="mx-auto mb-2 text-text-tertiary" />
+            <p class="text-body text-text-primary mb-1">Click to select file</p>
+            <p class="text-body-small text-text-secondary">Supports JPG, PNG, PDF (Max 10MB)</p>
+          </div>
+          <div v-if="uploading" class="text-center py-4">
+            <p class="text-body text-text-secondary">Processing timetable...</p>
+          </div>
+        </div>
+        <template #footer>
+          <div class="flex justify-end gap-3">
+            <Button variant="ghost" @click="showUploadModal = false">Cancel</Button>
+          </div>
+        </template>
       </BaseModal>
     </div>
   </AppLayout>
@@ -70,6 +114,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/Stores/auth'
 import { useTimetableStore } from '@/Stores/timetable'
+import api from '@/services/api'
 import AppLayout from '@/Components/Layout/AppLayout.vue'
 import Button from '@/Components/Common/Button.vue'
 import Select from '@/Components/Common/Select.vue'
@@ -78,17 +123,21 @@ import WeeklyGridView from '@/Components/Timetable/WeeklyGridView.vue'
 import ClassEntryForm from '@/Components/Timetable/ClassEntryForm.vue'
 import ConflictWarning from '@/Components/Timetable/ConflictWarning.vue'
 import StudySlotSuggestions from '@/Components/Timetable/StudySlotSuggestions.vue'
-import { Plus } from 'lucide-vue-next'
+import { Plus, Upload } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 const timetableStore = useTimetableStore()
 
 const user = computed(() => authStore.user)
 
-const currentSemester = ref(timetableStore.currentSemester)
+const currentSemester = ref(timetableStore.currentSemester || 'Fall 2024')
 const showClassForm = ref(false)
 const editingClass = ref(null)
 const saving = ref(false)
+const courses = ref([])
+const showUploadModal = ref(false)
+const uploading = ref(false)
+const fileInput = ref(null)
 
 const semesterOptions = computed(() => {
   return timetableStore.semesters.map(s => ({ value: s, label: s }))
@@ -101,8 +150,24 @@ const semesterClasses = computed(() => {
 const conflicts = computed(() => timetableStore.conflictingClasses)
 const studySlots = computed(() => timetableStore.studySlots)
 
+const fetchCourses = async () => {
+  try {
+    const response = await api.get('/courses')
+    if (response.success && response.data) {
+      courses.value = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.courses || response.data.data || [])
+    }
+  } catch (error) {
+    console.error('Failed to fetch courses:', error)
+  }
+}
+
 onMounted(async () => {
-  await timetableStore.fetchClasses(currentSemester.value)
+  await Promise.all([
+    timetableStore.fetchClasses(currentSemester.value),
+    fetchCourses()
+  ])
 })
 
 const handleSemesterChange = async (semester) => {
@@ -125,8 +190,45 @@ const handleSaveClass = async (classData) => {
       await timetableStore.addClass(classData)
     }
     handleCancelForm()
+    await timetableStore.fetchClasses(currentSemester.value)
+  } catch (error) {
+    console.error('Failed to save class:', error)
+    alert(error.message || 'Failed to save class')
   } finally {
     saving.value = false
+  }
+}
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  
+  if (file.size > 10 * 1024 * 1024) {
+    alert('File size must be less than 10MB')
+    return
+  }
+  
+  uploading.value = true
+  try {
+    const result = await timetableStore.uploadTimetable(file, currentSemester.value)
+    
+    if (result.requires_manual_review && result.parsed_classes) {
+      // Show parsed classes for review
+      alert(`Timetable processed! Found ${result.parsed_classes.length} classes. Please review and confirm.`)
+      // TODO: Show review modal with parsed classes
+    }
+    
+    // Refresh timetable
+    await timetableStore.fetchClasses(currentSemester.value)
+    showUploadModal.value = false
+  } catch (error) {
+    console.error('Failed to upload timetable:', error)
+    alert(error.message || 'Failed to upload timetable')
+  } finally {
+    uploading.value = false
+    if (event.target) {
+      event.target.value = ''
+    }
   }
 }
 

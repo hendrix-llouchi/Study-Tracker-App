@@ -5,22 +5,13 @@
     </h3>
 
     <form @submit.prevent="handleSubmit" class="space-y-4">
-      <Input
-        v-model="form.course"
-        type="text"
-        label="Course Name"
-        placeholder="e.g., Data Structures & Algorithms"
+      <Select
+        v-model="form.courseId"
+        label="Course"
+        placeholder="Select course"
+        :options="courseOptions"
         required
-        :error="errors.course"
-      />
-
-      <Input
-        v-model="form.code"
-        type="text"
-        label="Course Code"
-        placeholder="e.g., CS201"
-        required
-        :error="errors.code"
+        :error="errors.courseId"
       />
 
       <Select
@@ -107,6 +98,10 @@ const props = defineProps({
     type: Object,
     default: null
   },
+  courses: {
+    type: Array,
+    default: () => []
+  },
   existingClasses: {
     type: Array,
     default: () => []
@@ -122,17 +117,24 @@ const emit = defineEmits(['submit', 'cancel'])
 const isEdit = computed(() => !!props.classItem)
 
 const form = ref({
-  course: '',
-  code: '',
+  courseId: '',
   day: '',
   startTime: '',
   endTime: '',
   location: '',
   instructor: '',
+  classType: 'lecture',
   color: 'blue'
 })
 
 const errors = ref({})
+
+const courseOptions = computed(() => {
+  return props.courses.map(course => ({
+    value: course.id,
+    label: `${course.code || ''} - ${course.name || 'Unknown'}`
+  }))
+})
 
 const dayOptions = [
   { value: 'Monday', label: 'Monday' },
@@ -189,24 +191,24 @@ function hasTimeConflict(time1, time2) {
 watch(() => props.classItem, (newVal) => {
   if (newVal) {
     form.value = {
-      course: newVal.course || '',
-      code: newVal.code || '',
+      courseId: newVal.courseId || '',
       day: newVal.day || '',
       startTime: newVal.startTime || '',
       endTime: newVal.endTime || '',
       location: newVal.location || '',
       instructor: newVal.instructor || '',
+      classType: newVal.classType || 'lecture',
       color: newVal.color || 'blue'
     }
   } else {
     form.value = {
-      course: '',
-      code: '',
+      courseId: '',
       day: '',
       startTime: '',
       endTime: '',
       location: '',
       instructor: '',
+      classType: 'lecture',
       color: 'blue'
     }
   }
@@ -215,8 +217,7 @@ watch(() => props.classItem, (newVal) => {
 const handleSubmit = () => {
   errors.value = {}
   
-  if (!form.value.course) errors.value.course = 'Course name is required'
-  if (!form.value.code) errors.value.code = 'Course code is required'
+  if (!form.value.courseId) errors.value.courseId = 'Course is required'
   if (!form.value.day) errors.value.day = 'Day is required'
   if (!form.value.startTime) errors.value.startTime = 'Start time is required'
   if (!form.value.endTime) errors.value.endTime = 'End time is required'

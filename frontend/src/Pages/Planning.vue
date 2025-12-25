@@ -76,6 +76,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/Stores/auth'
 import { usePlanningStore } from '@/Stores/planning'
+import api from '@/services/api'
 import AppLayout from '@/Components/Layout/AppLayout.vue'
 import Button from '@/Components/Common/Button.vue'
 import Select from '@/Components/Common/Select.vue'
@@ -97,6 +98,7 @@ const showPlanModal = ref(false)
 const showCarryOverModal = ref(false)
 const editingPlan = ref(null)
 const carryOverFromDate = ref('')
+const courses = ref([])
 
 const viewModeOptions = [
   { value: 'day', label: 'Day View' },
@@ -110,15 +112,25 @@ const incompletePlansForDate = computed(() => {
   return plans.value.filter(p => p.date === carryOverFromDate.value && !p.completed)
 })
 
-const courses = ref([
-  { id: 'cs201', name: 'Data Structures & Algorithms' },
-  { id: 'cs301', name: 'Database Systems' },
-  { id: 'cs302', name: 'Computer Networks' },
-  { id: 'cs303', name: 'Software Engineering' }
-])
+const fetchCourses = async () => {
+  try {
+    const response = await api.get('/courses')
+    if (response.success && response.data) {
+      // Handle both array and paginated response
+      courses.value = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.courses || response.data.data || [])
+    }
+  } catch (error) {
+    console.error('Failed to fetch courses:', error)
+  }
+}
 
 onMounted(async () => {
-  await planningStore.fetchPlans(selectedDate.value)
+  await Promise.all([
+    planningStore.fetchPlans(selectedDate.value),
+    fetchCourses()
+  ])
 })
 
 const handleDateSelected = (date) => {
@@ -128,15 +140,21 @@ const handleDateSelected = (date) => {
 }
 
 const handleSavePlan = async (planData) => {
-  if (editingPlan.value) {
-    await planningStore.updatePlan(editingPlan.value.id, planData)
-  } else {
-    await planningStore.addPlan({
-      ...planData,
-      date: selectedDate.value
-    })
+  try {
+    if (editingPlan.value) {
+      await planningStore.updatePlan(editingPlan.value.id, planData)
+    } else {
+      await planningStore.addPlan({
+        ...planData,
+        date: selectedDate.value
+      })
+    }
+    handleCloseModal()
+    await planningStore.fetchPlans(selectedDate.value)
+  } catch (error) {
+    console.error('Failed to save plan:', error)
+    alert(error.message || 'Failed to save plan')
   }
-  handleCloseModal()
 }
 
 const handleCompletePlan = async (planId, actualTime) => {

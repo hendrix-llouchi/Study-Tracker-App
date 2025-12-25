@@ -1,7 +1,7 @@
 <template>
   <BaseModal
     :model-value="modelValue"
-    title="Create Study Plan"
+    :title="plan ? 'Edit Study Plan' : 'Create Study Plan'"
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <template #default>
@@ -70,12 +70,21 @@
           :error="errors.studyType"
         />
 
-        <div v-if="hasConflict" class="p-4 bg-accent-orange-light border border-accent-orange rounded-lg">
+        <div v-if="checkingConflict" class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <p class="text-body-small text-text-secondary">Checking for conflicts...</p>
+        </div>
+        
+        <div v-else-if="hasConflict && conflicts.length > 0" class="p-4 bg-accent-orange-light border border-accent-orange rounded-lg">
           <div class="flex items-start gap-2">
             <AlertTriangle :size="20" class="text-accent-orange flex-shrink-0 mt-0.5" />
-            <div>
-              <p class="text-body-small font-medium text-accent-orange mb-1">Schedule Conflict</p>
-              <p class="text-body-small text-text-secondary">This time conflicts with a scheduled class.</p>
+            <div class="flex-1">
+              <p class="text-body-small font-medium text-accent-orange mb-2">Schedule Conflict Detected</p>
+              <div class="space-y-1">
+                <p v-for="(conflict, index) in conflicts" :key="index" class="text-body-small text-text-secondary">
+                  Conflicts with <strong>{{ conflict.course_name }}</strong> 
+                  ({{ conflict.start_time }} - {{ conflict.end_time }}{{ conflict.location ? `, ${conflict.location}` : '' }})
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -93,7 +102,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { usePlanningStore } from '@/Stores/planning'
 import BaseModal from './BaseModal.vue'
 import Button from '@/Components/Common/Button.vue'
 import Input from '@/Components/Common/Input.vue'
@@ -108,10 +118,16 @@ const props = defineProps({
   courses: {
     type: Array,
     default: () => []
+  },
+  plan: {
+    type: Object,
+    default: null
   }
 })
 
 const emit = defineEmits(['update:modelValue', 'save', 'save-and-create'])
+
+const planningStore = usePlanningStore()
 
 const form = ref({
   date: '',
@@ -127,6 +143,8 @@ const errors = ref({})
 const error = ref('')
 const loading = ref(false)
 const hasConflict = ref(false)
+const conflicts = ref([])
+const checkingConflict = ref(false)
 
 const courseOptions = computed(() => {
   return props.courses.map(course => ({
@@ -147,6 +165,97 @@ const studyTypeOptions = [
   { value: 'practice', label: 'Practice' }
 ]
 
+// Watch for plan prop changes (editing mode)
+watch(() => props.plan, (newPlan) => {
+  if (newPlan) {
+    form.value = {
+      date: newPlan.date || '',
+      courseId: newPlan.courseId || '',
+      topic: newPlan.topic || '',
+      startTime: newPlan.startTime || '',
+      duration: newPlan.duration || '',
+      priority: newPlan.priority || 'medium',
+      studyType: newPlan.studyType || 'new-material'
+    }
+  } else {
+    // Reset form when closing
+    form.value = {
+      date: '',
+      courseId: '',
+      topic: '',
+      startTime: '',
+      duration: '',
+      priority: '',
+      studyType: ''
+    }
+    hasConflict.value = false
+    conflicts.value = []
+  }
+}, { immediate: true })
+
+// Watch for modal open/close
+watch(() => props.modelValue, (isOpen) => {
+  if (isOpen && props.plan) {
+    // Form is already set by plan watcher
+    checkConflictsDebounced()
+  } else if (!isOpen) {
+    // Reset on close
+    form.value = {
+      date: '',
+      courseId: '',
+      topic: '',
+      startTime: '',
+      duration: '',
+      priority: '',
+      studyType: ''
+    }
+    hasConflict.value = false
+    conflicts.value = []
+    errors.value = {}
+    error.value = ''
+  }
+})
+
+// Check conflicts when date, startTime, or duration changes
+let conflictCheckTimeout = null
+const checkConflictsDebounced = () => {
+  if (conflictCheckTimeout) {
+    clearTimeout(conflictCheckTimeout)
+  }
+  
+  conflictCheckTimeout = setTimeout(async () => {
+    if (!form.value.date || !form.value.startTime || !form.value.duration) {
+      hasConflict.value = false
+      conflicts.value = []
+      return
+    }
+    
+    checkingConflict.value = true
+    try {
+      const result = await planningStore.checkConflicts(
+        form.value.date,
+        form.value.startTime,
+        parseInt(form.value.duration) || 0
+      )
+      
+      hasConflict.value = result.has_conflicts || false
+      conflicts.value = result.conflicts || []
+    } catch (err) {
+      console.error('Failed to check conflicts:', err)
+      hasConflict.value = false
+      conflicts.value = []
+    } finally {
+      checkingConflict.value = false
+    }
+  }, 500) // Debounce by 500ms
+}
+
+watch([() => form.value.date, () => form.value.startTime, () => form.value.duration], () => {
+  if (props.modelValue) {
+    checkConflictsDebounced()
+  }
+})
+
 const handleSubmit = async () => {
   await savePlan(false)
 }
@@ -158,12 +267,23 @@ const handleSaveAndCreate = async () => {
 const savePlan = async (createAnother) => {
   errors.value = {}
   error.value = ''
+  
+  // Validation
+  if (!form.value.date) errors.value.date = 'Date is required'
+  if (!form.value.courseId) errors.value.courseId = 'Course is required'
+  if (!form.value.topic) errors.value.topic = 'Topic is required'
+  if (!form.value.startTime) errors.value.startTime = 'Start time is required'
+  if (!form.value.duration) errors.value.duration = 'Duration is required'
+  if (!form.value.priority) errors.value.priority = 'Priority is required'
+  if (!form.value.studyType) errors.value.studyType = 'Study type is required'
+  
+  if (Object.keys(errors.value).length > 0) {
+    return
+  }
+  
   loading.value = true
 
   try {
-    // Bypass API call for now
-    console.log('Plan created:', form.value)
-    
     if (createAnother) {
       emit('save-and-create', form.value)
       // Reset form but keep date
@@ -176,6 +296,8 @@ const savePlan = async (createAnother) => {
         priority: '',
         studyType: ''
       }
+      hasConflict.value = false
+      conflicts.value = []
     } else {
       emit('save', form.value)
       emit('update:modelValue', false)
