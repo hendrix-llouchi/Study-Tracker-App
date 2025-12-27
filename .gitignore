@@ -1,0 +1,43 @@
+# Environment files - NEVER commit these
+.env
+.env.*
+!.env.example
+*.env.local
+*.env.*.local
+
+# Sensitive documentation files
+*_SECRETS.md
+*_CREDENTIALS.md
+*_KEYS.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Database files (if using SQLite)
+*.sqlite
+*.sqlite3
+*.db
+
+# Backup files
+*.bak
+*.backup
+*~
+
