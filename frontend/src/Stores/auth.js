@@ -30,7 +30,13 @@ export const useAuthStore = defineStore('auth', {
 
     async login(credentials) {
       try {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/bd1c4c7e-781a-479d-9320-cf87ca4f25f6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'C,E',location:'auth.js:31',message:'Login attempt started',data:{email:credentials.email,apiBaseURL:import.meta.env.VITE_API_URL,windowOrigin:window.location.origin,timestamp:Date.now()},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const response = await api.post('/auth/login', credentials)
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/bd1c4c7e-781a-479d-9320-cf87ca4f25f6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'A',location:'auth.js:34',message:'Login API response received',data:{success:response.success,hasData:!!response.data,timestamp:Date.now()},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         if (response.success && response.data) {
           this.setUser(response.data.user)
           this.setToken(response.data.token)
@@ -38,6 +44,9 @@ export const useAuthStore = defineStore('auth', {
         }
         throw new Error(response.message || 'Login failed')
       } catch (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/bd1c4c7e-781a-479d-9320-cf87ca4f25f6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'C,E',location:'auth.js:42',message:'Login error caught',data:{message:error.message,errorCode:error.error_code,errors:error.errors,timestamp:Date.now()},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         throw error
       }
     },

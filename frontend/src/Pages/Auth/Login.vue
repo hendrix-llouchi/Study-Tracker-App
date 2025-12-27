@@ -145,9 +145,27 @@ const handleSubmit = async () => {
   try {
     await login(form.value)
   } catch (err) {
-    error.value = err.message || 'Invalid credentials. Please try again.'
+    // Handle validation errors from backend
     if (err.errors) {
-      errors.value = err.errors
+      errors.value = {}
+      // Laravel validation errors come as { field: ['message1', 'message2'] }
+      Object.keys(err.errors).forEach(key => {
+        // Convert array of messages to single string
+        if (Array.isArray(err.errors[key])) {
+          errors.value[key] = err.errors[key][0]
+        } else {
+          errors.value[key] = err.errors[key]
+        }
+      })
+      // Set general error message if email or password field has error
+      if (errors.value.email) {
+        error.value = errors.value.email
+      } else if (errors.value.password) {
+        error.value = errors.value.password
+      }
+    } else {
+      // Handle other error messages
+      error.value = err.message || 'Invalid credentials. Please try again.'
     }
   } finally {
     loading.value = false

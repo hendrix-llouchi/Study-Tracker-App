@@ -3,21 +3,23 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
+        apiPrefix: 'api/v1',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Use Laravel's built-in CORS middleware (reads from config/cors.php)
-        // This handles CORS for all API routes and Sanctum CSRF cookie route
-        $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
+        // Use Laravel's built-in CORS middleware in global stack to handle OPTIONS preflight requests
+        // This must run before routing to catch OPTIONS requests properly
+        $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
+        
+        // Enable stateful API for cookie-based authentication
+        $middleware->statefulApi();
 
         $middleware->alias([
             'log.api' => \App\Http\Middleware\LogApiRequests::class,

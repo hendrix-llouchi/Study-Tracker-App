@@ -13,6 +13,13 @@ class HandleCors
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // #region agent log
+        $logData = ['origin' => $request->headers->get('Origin'), 'method' => $request->getMethod(), 'path' => $request->path(), 'sanctum_stateful' => config('sanctum.stateful', []), 'session_domain' => config('session.domain'), 'timestamp' => time()];
+        $logPath = 'c:\xampp\htdocs\Study-Tracker-App\.cursor\debug.log';
+        $logEntry = json_encode(['sessionId' => 'debug-session', 'runId' => 'run1', 'hypothesisId' => 'A,B', 'location' => 'HandleCors.php:16', 'message' => 'CORS middleware entry', 'data' => $logData, 'timestamp' => time() * 1000]) . "\n";
+        @file_put_contents($logPath, $logEntry, FILE_APPEND | LOCK_EX);
+        \Log::info('CORS Debug', ['data' => $logData]);
+        // #endregion
         $origin = $request->headers->get('Origin');
         
         // Allow any origin on port 5173 (for development)
@@ -37,8 +44,21 @@ class HandleCors
         // If no origin or not allowed, use default
         $allowedOrigin = $isAllowed ? $origin : 'http://localhost:5173';
         
+        // #region agent log
+        $logPath = 'c:\xampp\htdocs\Study-Tracker-App\.cursor\debug.log';
+        $logEntry = json_encode(['sessionId' => 'debug-session', 'runId' => 'run1', 'hypothesisId' => 'A,D,E', 'location' => 'HandleCors.php:45', 'message' => 'Origin validation result', 'data' => ['origin' => $origin, 'isAllowed' => $isAllowed, 'allowedOrigin' => $allowedOrigin, 'timestamp' => time() * 1000], 'timestamp' => time() * 1000]) . "\n";
+        @file_put_contents($logPath, $logEntry, FILE_APPEND | LOCK_EX);
+        \Log::info('CORS Origin Validation', ['origin' => $origin, 'isAllowed' => $isAllowed, 'allowedOrigin' => $allowedOrigin]);
+        // #endregion
+        
         // Handle preflight requests - must return response with headers immediately
         if ($request->getMethod() === 'OPTIONS') {
+            // #region agent log
+            $logPath = 'c:\xampp\htdocs\Study-Tracker-App\.cursor\debug.log';
+            $logEntry = json_encode(['sessionId' => 'debug-session', 'runId' => 'run1', 'hypothesisId' => 'E', 'location' => 'HandleCors.php:52', 'message' => 'OPTIONS preflight response', 'data' => ['allowedOrigin' => $allowedOrigin, 'credentials' => 'true', 'timestamp' => time() * 1000], 'timestamp' => time() * 1000]) . "\n";
+            @file_put_contents($logPath, $logEntry, FILE_APPEND | LOCK_EX);
+            \Log::info('CORS Preflight', ['allowedOrigin' => $allowedOrigin]);
+            // #endregion
             return response('', 200)
                 ->header('Access-Control-Allow-Origin', $allowedOrigin)
                 ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
@@ -62,6 +82,14 @@ class HandleCors
             $response->headers->remove('Access-Control-Allow-Origin');
             $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin, true);
         }
+
+        // #region agent log
+        $finalHeaders = ['Access-Control-Allow-Origin' => $response->headers->get('Access-Control-Allow-Origin'), 'Access-Control-Allow-Credentials' => $response->headers->get('Access-Control-Allow-Credentials')];
+        $logPath = 'c:\xampp\htdocs\Study-Tracker-App\.cursor\debug.log';
+        $logEntry = json_encode(['sessionId' => 'debug-session', 'runId' => 'run1', 'hypothesisId' => 'D,E', 'location' => 'HandleCors.php:80', 'message' => 'CORS headers set on response', 'data' => array_merge($finalHeaders, ['status' => $response->getStatusCode(), 'timestamp' => time() * 1000]), 'timestamp' => time() * 1000]) . "\n";
+        @file_put_contents($logPath, $logEntry, FILE_APPEND | LOCK_EX);
+        \Log::info('CORS Response Headers', array_merge($finalHeaders, ['status' => $response->getStatusCode()]));
+        // #endregion
 
         return $response;
     }

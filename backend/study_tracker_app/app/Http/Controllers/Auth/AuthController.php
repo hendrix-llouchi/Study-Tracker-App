@@ -53,15 +53,44 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
+        // #region agent log
+        $logPath = 'c:\xampp\htdocs\Study-Tracker-App\.cursor\debug.log';
+        $logEntry = json_encode(['sessionId' => 'debug-session', 'runId' => 'run1', 'hypothesisId' => 'A,B,C', 'location' => 'AuthController.php:56', 'message' => 'Login method called', 'data' => ['email' => $request->email, 'origin' => $request->headers->get('Origin'), 'timestamp' => time() * 1000], 'timestamp' => time() * 1000]) . "\n";
+        @file_put_contents($logPath, $logEntry, FILE_APPEND | LOCK_EX);
+        \Log::info('Login Attempt', ['email' => $request->email, 'origin' => $request->headers->get('Origin')]);
+        // #endregion
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!$user) {
+            // #region agent log
+            $logPath = 'c:\xampp\htdocs\Study-Tracker-App\.cursor\debug.log';
+            $logEntry = json_encode(['sessionId' => 'debug-session', 'runId' => 'run1', 'hypothesisId' => 'A', 'location' => 'AuthController.php:61', 'message' => 'User not found', 'data' => ['email' => $request->email, 'timestamp' => time() * 1000], 'timestamp' => time() * 1000]) . "\n";
+            @file_put_contents($logPath, $logEntry, FILE_APPEND | LOCK_EX);
+            // #endregion
             throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
+                'email' => ['The provided email address is not registered.'],
+            ]);
+        }
+
+        if (!Hash::check($request->password, $user->password)) {
+            // #region agent log
+            $logPath = 'c:\xampp\htdocs\Study-Tracker-App\.cursor\debug.log';
+            $logEntry = json_encode(['sessionId' => 'debug-session', 'runId' => 'run1', 'hypothesisId' => 'A', 'location' => 'AuthController.php:67', 'message' => 'Invalid password', 'data' => ['email' => $request->email, 'timestamp' => time() * 1000], 'timestamp' => time() * 1000]) . "\n";
+            @file_put_contents($logPath, $logEntry, FILE_APPEND | LOCK_EX);
+            // #endregion
+            throw ValidationException::withMessages([
+                'password' => ['The password you entered is incorrect.'],
             ]);
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        // #region agent log
+        $logPath = 'c:\xampp\htdocs\Study-Tracker-App\.cursor\debug.log';
+        $logEntry = json_encode(['sessionId' => 'debug-session', 'runId' => 'run1', 'hypothesisId' => 'A', 'location' => 'AuthController.php:73', 'message' => 'Login successful', 'data' => ['userId' => $user->id, 'tokenCreated' => true, 'timestamp' => time() * 1000], 'timestamp' => time() * 1000]) . "\n";
+        @file_put_contents($logPath, $logEntry, FILE_APPEND | LOCK_EX);
+        \Log::info('Login Success', ['userId' => $user->id]);
+        // #endregion
 
         return $this->successResponse([
             'user' => $user->makeHidden(['password', 'remember_token'])->load('preferences'),
