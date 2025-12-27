@@ -56,6 +56,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import api from '@/services/api'
 import GuestLayout from '@/Components/Layout/GuestLayout.vue'
 import Card from '@/Components/Common/Card.vue'
 import Button from '@/Components/Common/Button.vue'
@@ -77,13 +78,33 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    // Bypass API call for now
-    success.value = 'Password reset link has been sent to your email address.'
-    form.value.email = ''
+    const response = await api.post('/auth/forgot-password', {
+      email: form.value.email
+    })
+
+    if (response.success) {
+      success.value = response.message || 'Password reset link has been sent to your email address.'
+      form.value.email = ''
+    } else {
+      error.value = response.message || 'Failed to send reset link. Please try again.'
+    }
   } catch (err) {
-    error.value = err.message || 'Failed to send reset link. Please try again.'
+    // Handle validation errors from backend
     if (err.errors) {
-      errors.value = err.errors
+      errors.value = {}
+      Object.keys(err.errors).forEach(key => {
+        if (Array.isArray(err.errors[key])) {
+          errors.value[key] = err.errors[key][0]
+        } else {
+          errors.value[key] = err.errors[key]
+        }
+      })
+      // Set general error message if email field has error
+      if (errors.value.email) {
+        error.value = errors.value.email
+      }
+    } else {
+      error.value = err.message || 'Failed to send reset link. Please try again.'
     }
   } finally {
     loading.value = false

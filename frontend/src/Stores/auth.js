@@ -109,6 +109,20 @@ export const useAuthStore = defineStore('auth', {
       } catch (error) {
         throw error
       }
+    },
+
+    async googleAuth(googleData) {
+      try {
+        const response = await api.post('/auth/google', googleData)
+        if (response.success && response.data) {
+          this.setUser(response.data.user)
+          this.setToken(response.data.token)
+          return { user: response.data.user, token: response.data.token }
+        }
+        throw new Error(response.message || 'Google authentication failed')
+      } catch (error) {
+        throw error
+      }
     }
   }
 })

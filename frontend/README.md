@@ -14,10 +14,19 @@ npm install
 cp .env.example .env
 ```
 
-3. Configure API URL in `.env`:
+3. Configure API URL and Google OAuth in `.env`:
 ```
 VITE_API_URL=http://localhost:8000/api/v1
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
+
+**Note:** To use Google OAuth, you need to:
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable Google+ API
+3. Create OAuth 2.0 credentials
+4. Add authorized JavaScript origins (e.g., `http://localhost:5173`)
+5. Add authorized redirect URIs
+6. Copy the Client ID to your `.env` file
 
 4. Start development server:
 ```bash

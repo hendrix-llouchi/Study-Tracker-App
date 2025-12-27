@@ -11,6 +11,10 @@
         
         <Card padding="lg">
           <form @submit.prevent="handleSubmit" class="space-y-6">
+            <div v-if="success" class="bg-primary-green-bg border border-primary-green-light rounded-md p-4">
+              <p class="text-body-small text-text-success">{{ success }}</p>
+            </div>
+
             <div v-if="error" class="bg-red-50 border border-red-200 rounded-md p-4">
               <p class="text-body-small text-accent-red">{{ error }}</p>
             </div>
@@ -79,6 +83,8 @@
               variant="secondary"
               size="lg"
               class="w-full"
+              :loading="googleLoading"
+              :disabled="googleLoading || loading"
               @click="handleGoogleLogin"
             >
               <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -116,16 +122,19 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/Composables/useAuth'
+import { useAuthStore } from '@/Stores/auth'
 import GuestLayout from '@/Components/Layout/GuestLayout.vue'
 import Card from '@/Components/Common/Card.vue'
 import Button from '@/Components/Common/Button.vue'
 import Input from '@/Components/Common/Input.vue'
 
 const router = useRouter()
+const route = useRoute()
 const { login } = useAuth()
+const authStore = useAuthStore()
 
 const form = ref({
   email: '',
@@ -135,7 +144,9 @@ const form = ref({
 
 const errors = ref({})
 const error = ref('')
+const success = ref('')
 const loading = ref(false)
+const googleLoading = ref(false)
 
 const handleSubmit = async () => {
   errors.value = {}
@@ -172,9 +183,99 @@ const handleSubmit = async () => {
   }
 }
 
-const handleGoogleLogin = () => {
-  // TODO: Implement Google OAuth
-  console.log('Google login')
+const handleGoogleLogin = async () => {
+  googleLoading.value = true
+  error.value = ''
+
+  try {
+    // Check if Google Client ID is configured
+    if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+      error.value = 'Google OAuth is not configured. Please contact support.'
+      googleLoading.value = false
+      return
+    }
+
+    // Load Google Identity Services script if not already loaded
+    if (!window.google) {
+      await loadGoogleScript()
+    }
+
+    // Use Google Identity Services with popup flow
+    window.google.accounts.oauth2.initTokenClient({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      scope: 'email profile',
+      callback: async (response) => {
+        if (response.access_token) {
+          await handleGoogleTokenResponse(response.access_token)
+        } else if (response.error) {
+          console.error('Google OAuth error:', response.error)
+          error.value = 'Google authentication was cancelled or failed. Please try again.'
+          googleLoading.value = false
+        }
+      }
+    }).requestAccessToken()
+  } catch (err) {
+    console.error('Google OAuth error:', err)
+    error.value = 'Failed to initialize Google sign-in. Please try again.'
+    googleLoading.value = false
+  }
 }
+
+const handleGoogleTokenResponse = async (accessToken) => {
+  try {
+    // Fetch user info from Google
+    const userInfoResponse = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`)
+    const userInfo = await userInfoResponse.json()
+
+    // Send to backend
+    await authStore.googleAuth({
+      token: accessToken,
+      name: userInfo.name,
+      email: userInfo.email,
+      google_id: userInfo.id
+    })
+
+    // Redirect to dashboard
+    router.push('/dashboard')
+  } catch (err) {
+    console.error('Google token response error:', err)
+    error.value = err.message || 'Google authentication failed. Please try again.'
+  } finally {
+    googleLoading.value = false
+  }
+}
+
+const loadGoogleScript = () => {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.accounts) {
+      resolve()
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load Google script'))
+    document.head.appendChild(script)
+  })
+}
+
+onMounted(() => {
+  // Check for password reset success message
+  if (route.query.reset === 'success') {
+    success.value = 'Password reset successful! You can now sign in with your new password.'
+    // Clear the query parameter
+    router.replace({ query: {} })
+  }
+
+  // Preload Google script
+  if (import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+    loadGoogleScript().catch(() => {
+      console.warn('Google OAuth not configured. Set VITE_GOOGLE_CLIENT_ID in your .env file.')
+    })
+  }
+})
 </script>
 

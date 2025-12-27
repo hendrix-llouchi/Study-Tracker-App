@@ -16,6 +16,16 @@
             </div>
 
             <Input
+              v-model="form.email"
+              type="email"
+              label="Email address"
+              placeholder="you@example.com"
+              required
+              :error="errors.email"
+              :disabled="!!route.query.email"
+            />
+
+            <Input
               v-model="form.password"
               type="password"
               label="New password"
@@ -59,6 +69,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import api from '@/services/api'
 import GuestLayout from '@/Components/Layout/GuestLayout.vue'
 import Card from '@/Components/Common/Card.vue'
 import Button from '@/Components/Common/Button.vue'
@@ -70,7 +81,8 @@ const router = useRouter()
 const form = ref({
   password: '',
   password_confirmation: '',
-  token: ''
+  token: '',
+  email: ''
 })
 
 const errors = ref({})
@@ -78,7 +90,21 @@ const error = ref('')
 const loading = ref(false)
 
 onMounted(() => {
-  form.value.token = route.params.token
+  // Get token from route params
+  form.value.token = route.params.token || ''
+  
+  // Get email from query params (Laravel typically includes email in the reset URL)
+  form.value.email = route.query.email || ''
+  
+  // If no email in query, show error
+  if (!form.value.email) {
+    error.value = 'Invalid reset link. Please request a new password reset link.'
+  }
+  
+  // If no token, show error
+  if (!form.value.token) {
+    error.value = 'Invalid reset link. Please request a new password reset link.'
+  }
 })
 
 const handleSubmit = async () => {
@@ -86,20 +112,69 @@ const handleSubmit = async () => {
   error.value = ''
   loading.value = true
 
+  // Client-side validation
+  if (!form.value.email) {
+    error.value = 'Email is required. Please use the link from your email.'
+    loading.value = false
+    return
+  }
+
+  if (!form.value.token) {
+    error.value = 'Reset token is required. Please use the link from your email.'
+    loading.value = false
+    return
+  }
+
   if (form.value.password !== form.value.password_confirmation) {
     errors.value.password_confirmation = 'Passwords do not match'
     loading.value = false
     return
   }
 
+  if (form.value.password.length < 8) {
+    errors.value.password = 'Password must be at least 8 characters long'
+    loading.value = false
+    return
+  }
+
   try {
-    // Bypass API call for now
-    console.log('Password reset:', form.value)
-    router.push('/login')
+    const response = await api.post('/auth/reset-password', {
+      token: form.value.token,
+      email: form.value.email,
+      password: form.value.password,
+      password_confirmation: form.value.password_confirmation
+    })
+
+    if (response.success) {
+      // Show success message and redirect to login
+      router.push({
+        path: '/login',
+        query: { reset: 'success' }
+      })
+    } else {
+      error.value = response.message || 'Failed to reset password. Please try again.'
+    }
   } catch (err) {
-    error.value = err.message || 'Failed to reset password. Please try again.'
+    // Handle validation errors from backend
     if (err.errors) {
-      errors.value = err.errors
+      errors.value = {}
+      Object.keys(err.errors).forEach(key => {
+        if (Array.isArray(err.errors[key])) {
+          errors.value[key] = err.errors[key][0]
+        } else {
+          errors.value[key] = err.errors[key]
+        }
+      })
+      // Set general error message if email or token field has error
+      if (errors.value.email) {
+        error.value = errors.value.email
+      } else if (errors.value.token) {
+        error.value = errors.value.token
+      } else if (errors.value.password) {
+        error.value = errors.value.password
+      }
+    } else {
+      error.value = err.message || 'Failed to reset password. Please try again.'
     }
   } finally {
     loading.value = false
