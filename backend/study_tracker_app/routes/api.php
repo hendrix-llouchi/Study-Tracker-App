@@ -1,15 +1,26 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\CourseController;
+use App\Http\Controllers\PerformanceController;
+use App\Http\Controllers\StudyPlanController;
+use App\Http\Controllers\TimetableController;
+use App\Http\Controllers\AssignmentController;
+use App\Http\Controllers\ProgressController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\AiCoachController;
+use App\Http\Controllers\FileUploadController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| API Routes - v1
 |--------------------------------------------------------------------------
 |
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
+| All routes are automatically prefixed with 'api/v1' via bootstrap/app.php
 |
 */
 
@@ -22,104 +33,107 @@ Route::get('/health', function () {
     ]);
 });
 
-// Authentication routes
+// ============================================
+// PUBLIC ROUTES (No Authentication Required)
+// ============================================
 Route::prefix('auth')->group(function () {
-    Route::post('/register', [App\Http\Controllers\Auth\AuthController::class, 'register']);
-    Route::post('/login', [App\Http\Controllers\Auth\AuthController::class, 'login']);
-    Route::post('/google', [App\Http\Controllers\Auth\GoogleAuthController::class, 'handle']);
-    Route::post('/forgot-password', [App\Http\Controllers\Auth\PasswordResetController::class, 'sendResetLink']);
-    Route::post('/reset-password', [App\Http\Controllers\Auth\PasswordResetController::class, 'reset']);
-    
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout']);
-        Route::get('/me', [App\Http\Controllers\Auth\AuthController::class, 'me']);
-    });
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink']);
+    Route::post('/reset-password', [PasswordResetController::class, 'reset']);
+    Route::post('/google', [AuthController::class, 'googleAuth']);
 });
 
-// Protected routes
+// ============================================
+// PROTECTED ROUTES (Require Authentication)
+// ============================================
 Route::middleware('auth:sanctum')->group(function () {
+    
+    // Auth routes
+    Route::prefix('auth')->group(function () {
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/logout', [AuthController::class, 'logout']);
+    });
     // Dashboard routes
     Route::prefix('dashboard')->group(function () {
-        Route::get('/stats', [App\Http\Controllers\DashboardController::class, 'stats']);
-        Route::get('/upcoming-classes', [App\Http\Controllers\DashboardController::class, 'upcomingClasses']);
-        Route::get('/study-streak', [App\Http\Controllers\DashboardController::class, 'studyStreak']);
-        Route::get('/activities', [App\Http\Controllers\DashboardController::class, 'activities']);
+        Route::get('/stats', [DashboardController::class, 'stats']);
+        Route::get('/upcoming-classes', [DashboardController::class, 'upcomingClasses']);
+        Route::get('/study-streak', [DashboardController::class, 'studyStreak']);
+        Route::get('/activities', [DashboardController::class, 'activities']);
     });
-
+    
     // Course routes
-    Route::apiResource('courses', App\Http\Controllers\CourseController::class);
-
+    Route::apiResource('courses', CourseController::class);
+    
     // Performance routes
     Route::prefix('performance')->group(function () {
-        Route::get('/results', [App\Http\Controllers\PerformanceController::class, 'index']);
-        Route::post('/results', [App\Http\Controllers\PerformanceController::class, 'store']);
-        Route::post('/results/bulk', [App\Http\Controllers\PerformanceController::class, 'bulkUpload']);
-        Route::get('/results/{id}', [App\Http\Controllers\PerformanceController::class, 'show']);
-        Route::put('/results/{id}', [App\Http\Controllers\PerformanceController::class, 'update']);
-        Route::delete('/results/{id}', [App\Http\Controllers\PerformanceController::class, 'destroy']);
-        Route::get('/gpa-trend', [App\Http\Controllers\PerformanceController::class, 'gpaTrend']);
-        Route::get('/subjects', [App\Http\Controllers\PerformanceController::class, 'subjects']);
+        Route::get('/results', [PerformanceController::class, 'index']);
+        Route::post('/results', [PerformanceController::class, 'store']);
+        Route::get('/results/{id}', [PerformanceController::class, 'show']);
+        Route::put('/results/{id}', [PerformanceController::class, 'update']);
+        Route::delete('/results/{id}', [PerformanceController::class, 'destroy']);
+        Route::post('/results/bulk', [PerformanceController::class, 'bulkUpload']);
+        Route::get('/gpa-trend', [PerformanceController::class, 'gpaTrend']);
+        Route::get('/subjects', [PerformanceController::class, 'subjects']);
     });
-
-    // Study Planning routes
+    
+    // Study planning routes
     Route::prefix('planning')->group(function () {
-        Route::get('/plans', [App\Http\Controllers\StudyPlanController::class, 'index']);
-        Route::post('/plans', [App\Http\Controllers\StudyPlanController::class, 'store']);
-        Route::get('/plans/{id}', [App\Http\Controllers\StudyPlanController::class, 'show']);
-        Route::put('/plans/{id}', [App\Http\Controllers\StudyPlanController::class, 'update']);
-        Route::delete('/plans/{id}', [App\Http\Controllers\StudyPlanController::class, 'destroy']);
-        Route::patch('/plans/{id}/complete', [App\Http\Controllers\StudyPlanController::class, 'complete']);
-        Route::post('/plans/check-conflicts', [App\Http\Controllers\StudyPlanController::class, 'checkConflicts']);
+        Route::get('/plans', [StudyPlanController::class, 'index']);
+        Route::post('/plans', [StudyPlanController::class, 'store']);
+        Route::get('/plans/{id}', [StudyPlanController::class, 'show']);
+        Route::put('/plans/{id}', [StudyPlanController::class, 'update']);
+        Route::delete('/plans/{id}', [StudyPlanController::class, 'destroy']);
+        Route::patch('/plans/{id}/complete', [StudyPlanController::class, 'complete']);
+        Route::post('/plans/check-conflicts', [StudyPlanController::class, 'checkConflicts']);
     });
-
+    
     // Timetable routes
     Route::prefix('timetable')->group(function () {
-        Route::get('/', [App\Http\Controllers\TimetableController::class, 'index']);
-        Route::post('/', [App\Http\Controllers\TimetableController::class, 'store']);
-        Route::post('/upload', [App\Http\Controllers\TimetableController::class, 'upload']);
-        Route::put('/classes/{id}', [App\Http\Controllers\TimetableController::class, 'updateClass']);
-        Route::delete('/classes/{id}', [App\Http\Controllers\TimetableController::class, 'deleteClass']);
+        Route::get('/', [TimetableController::class, 'index']);
+        Route::post('/', [TimetableController::class, 'store']);
+        Route::post('/upload', [TimetableController::class, 'upload']);
+        Route::put('/classes/{id}', [TimetableController::class, 'updateClass']);
+        Route::delete('/classes/{id}', [TimetableController::class, 'deleteClass']);
     });
-
+    
     // Assignment routes
-    Route::apiResource('assignments', App\Http\Controllers\AssignmentController::class);
-    Route::patch('/assignments/{id}/complete', [App\Http\Controllers\AssignmentController::class, 'complete']);
-
-    // Progress & Reports routes
+    Route::apiResource('assignments', AssignmentController::class);
+    Route::patch('/assignments/{id}/complete', [AssignmentController::class, 'complete']);
+    
+    // Progress routes
     Route::prefix('progress')->group(function () {
-        Route::get('/weekly', [App\Http\Controllers\ProgressController::class, 'weekly']);
-        Route::post('/weekly/generate', [App\Http\Controllers\ProgressController::class, 'generateWeekly']);
-        Route::get('/analytics', [App\Http\Controllers\ProgressController::class, 'analytics']);
+        Route::get('/weekly', [ProgressController::class, 'weekly']);
+        Route::post('/weekly/generate', [ProgressController::class, 'generateWeekly']);
+        Route::get('/analytics', [ProgressController::class, 'analytics']);
     });
-
+    
     // Notification routes
     Route::prefix('notifications')->group(function () {
-        Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);
-        Route::patch('/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead']);
-        Route::post('/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::patch('/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
     });
-
+    
     // Settings routes
     Route::prefix('settings')->group(function () {
-        Route::get('/profile', [App\Http\Controllers\SettingsController::class, 'profile']);
-        Route::put('/profile', [App\Http\Controllers\SettingsController::class, 'updateProfile']);
-        Route::post('/avatar', [App\Http\Controllers\SettingsController::class, 'uploadAvatar']);
-        Route::get('/preferences', [App\Http\Controllers\SettingsController::class, 'preferences']);
-        Route::put('/preferences', [App\Http\Controllers\SettingsController::class, 'updatePreferences']);
-        Route::post('/change-password', [App\Http\Controllers\SettingsController::class, 'changePassword']);
-        Route::post('/export-data', [App\Http\Controllers\SettingsController::class, 'exportData']);
-        Route::delete('/account', [App\Http\Controllers\SettingsController::class, 'deleteAccount']);
+        Route::get('/profile', [SettingsController::class, 'profile']);
+        Route::put('/profile', [SettingsController::class, 'updateProfile']);
+        Route::get('/preferences', [SettingsController::class, 'preferences']);
+        Route::put('/preferences', [SettingsController::class, 'updatePreferences']);
+        Route::post('/avatar', [SettingsController::class, 'uploadAvatar']);
+        Route::post('/change-password', [SettingsController::class, 'changePassword']);
+        Route::post('/export-data', [SettingsController::class, 'exportData']);
+        Route::delete('/account', [SettingsController::class, 'deleteAccount']);
     });
-
+    
     // AI Coach routes (Phase 2)
     Route::prefix('ai-coach')->group(function () {
-        Route::post('/chat', [App\Http\Controllers\AiCoachController::class, 'chat']);
-        Route::get('/history', [App\Http\Controllers\AiCoachController::class, 'history']);
+        Route::post('/chat', [AiCoachController::class, 'chat']);
+        Route::get('/history', [AiCoachController::class, 'history']);
     });
-
+    
     // File upload routes
-    Route::prefix('files')->group(function () {
-        Route::post('/upload', [App\Http\Controllers\FileUploadController::class, 'upload']);
-    });
+    Route::post('/files/upload', [FileUploadController::class, 'upload']);
 });
 

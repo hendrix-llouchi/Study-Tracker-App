@@ -197,20 +197,39 @@ const handleGoogleRegister = async () => {
       await loadGoogleScript()
     }
 
+    // Set up a timeout to reset loading state if callback doesn't fire
+    const timeoutId = setTimeout(() => {
+      if (googleLoading.value) {
+        console.warn('Google OAuth timeout - resetting loading state')
+        googleLoading.value = false
+        error.value = 'Google authentication timed out. Please try again.'
+      }
+    }, 60000) // 60 second timeout
+
     // Use Google Identity Services with popup flow
-    window.google.accounts.oauth2.initTokenClient({
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
       scope: 'email profile',
       callback: async (response) => {
+        // Clear timeout since callback fired
+        clearTimeout(timeoutId)
+        
         if (response.access_token) {
           await handleGoogleTokenResponse(response.access_token)
         } else if (response.error) {
           console.error('Google OAuth error:', response.error)
           error.value = 'Google authentication was cancelled or failed. Please try again.'
           googleLoading.value = false
+        } else {
+          // No access token and no error - user likely closed popup
+          console.warn('Google OAuth: No access token and no error - user may have closed popup')
+          error.value = 'Google authentication was cancelled. Please try again.'
+          googleLoading.value = false
         }
       }
-    }).requestAccessToken()
+    })
+    
+    tokenClient.requestAccessToken()
   } catch (err) {
     console.error('Google OAuth error:', err)
     error.value = 'Failed to initialize Google sign-in. Please try again.'
@@ -220,24 +239,25 @@ const handleGoogleRegister = async () => {
 
 const handleGoogleTokenResponse = async (accessToken) => {
   try {
-    // Fetch user info from Google
-    const userInfoResponse = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`)
-    const userInfo = await userInfoResponse.json()
-
-    // Send to backend
+    // Send only token to backend - let Socialite handle verification
     await authStore.googleAuth({
-      token: accessToken,
-      name: userInfo.name,
-      email: userInfo.email,
-      google_id: userInfo.id
+      token: accessToken
     })
 
     // Redirect to onboarding or dashboard
     router.push('/onboarding/profile')
   } catch (err) {
     console.error('Google token response error:', err)
-    error.value = err.message || 'Google authentication failed. Please try again.'
-  } finally {
+    // Handle API errors with more detail
+    if (err.errors) {
+      // Backend validation errors
+      const errorMessages = Object.values(err.errors).flat()
+      error.value = errorMessages[0] || 'Google authentication failed. Please try again.'
+    } else if (err.message) {
+      error.value = err.message
+    } else {
+      error.value = 'Google authentication failed. Please try again.'
+    }
     googleLoading.value = false
   }
 }

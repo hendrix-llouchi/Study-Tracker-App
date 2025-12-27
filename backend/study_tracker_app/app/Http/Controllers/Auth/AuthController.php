@@ -11,7 +11,9 @@ use App\Models\UserPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
@@ -26,7 +28,7 @@ class AuthController extends Controller
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
-                'password' => Hash::make($request->password),
+                'password' => $request->password, // Will be automatically hashed by the 'hashed' cast
                 'university' => $request->university,
             ]);
 
@@ -96,6 +98,76 @@ class AuthController extends Controller
             'user' => $user->makeHidden(['password', 'remember_token'])->load('preferences'),
             'token' => $token,
         ], 'Login successful');
+    }
+
+    /**
+     * Handle Google OAuth authentication.
+     */
+    public function googleAuth(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'token' => 'required|string',
+            ]);
+
+            // Verify the Google token using Socialite
+            $googleUser = Socialite::driver('google')
+                ->stateless()
+                ->userFromToken($request->token);
+
+            // Check if user exists
+            $existingUser = User::where('email', $googleUser->getEmail())
+                ->orWhere('google_id', $googleUser->getId())
+                ->first();
+
+            // Prepare data for updateOrCreate
+            $userData = [
+                'name' => $googleUser->getName(),
+                'google_id' => $googleUser->getId(),
+                'avatar_url' => $googleUser->getAvatar(),
+                'email_verified_at' => now(),
+            ];
+
+            // Only set password for new users (will be automatically hashed by the 'hashed' cast)
+            if (!$existingUser) {
+                $userData['password'] = Str::random(32);
+            }
+
+            // Find or create user by email
+            $user = User::updateOrCreate(
+                [
+                    'email' => $googleUser->getEmail(),
+                ],
+                $userData
+            );
+
+            // Update google_id and avatar if they weren't set or changed
+            if (!$user->google_id || $user->google_id !== $googleUser->getId()) {
+                $user->update([
+                    'google_id' => $googleUser->getId(),
+                    'avatar_url' => $googleUser->getAvatar() ?? $user->avatar_url,
+                ]);
+            }
+
+            // Create default preferences if they don't exist
+            if (!$user->preferences) {
+                UserPreference::create([
+                    'user_id' => $user->id,
+                    'timezone' => 'UTC',
+                ]);
+            }
+
+            // Issue a new Sanctum token
+            $token = $user->createToken('auth-token')->plainTextToken;
+
+            return $this->successResponse([
+                'user' => $user->makeHidden(['password', 'remember_token', 'google_id'])->load('preferences'),
+                'token' => $token,
+            ], 'Google authentication successful');
+        } catch (\Exception $e) {
+            \Log::error('Google OAuth error: ' . $e->getMessage());
+            return $this->errorResponse('Google authentication failed: ' . $e->getMessage(), null, 500);
+        }
     }
 
     /**

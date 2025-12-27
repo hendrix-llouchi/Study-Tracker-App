@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // This must run before routing to catch OPTIONS requests properly
         $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
         
+        // Add Content Security Policy middleware for Google OAuth support
+        $middleware->append(\App\Http\Middleware\ContentSecurityPolicy::class);
+        
         // Enable stateful API for cookie-based authentication
         $middleware->statefulApi();
 
@@ -63,8 +66,33 @@ return Application::configure(basePath: dirname(__DIR__))
             return $response;
         };
         
+        // Helper function to add CSP headers
+        $addCspHeaders = function ($response) {
+            $csp = [
+                "default-src 'self'",
+                // Ensure 'unsafe-eval' is added if Google Identity needs it (common for some loaders)
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'report-sample' blob: https://accounts.google.com https://apis.google.com",
+                "script-src-elem 'self' 'unsafe-inline' 'report-sample' blob: https://accounts.google.com https://apis.google.com",
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+                "font-src 'self' https://fonts.gstatic.com data:",
+                "img-src 'self' data: blob: https:",
+                // Added googleapis.com to connect-src
+                "connect-src 'self' https://accounts.google.com https://*.googleapis.com http://localhost:8000 http://127.0.0.1:8000 http://localhost:5173 http://127.0.0.1:5173",
+                "frame-src 'self' https://accounts.google.com",
+                "frame-ancestors 'self'",
+                "object-src 'none'",
+                "base-uri 'self'",
+                "form-action 'self'",
+                "upgrade-insecure-requests",
+            ];
+            $cspHeader = implode('; ', $csp);
+            // Force override any existing header
+            $response->headers->set('Content-Security-Policy', $cspHeader, true);
+            return $response;
+        };
+        
         // Handle validation exceptions
-        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, $request) use ($addCorsHeaders) {
+        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, $request) use ($addCorsHeaders, $addCspHeaders) {
             if ($request->is('api/*')) {
                 $response = response()->json([
                     'success' => false,
@@ -73,12 +101,13 @@ return Application::configure(basePath: dirname(__DIR__))
                     'error_code' => 'VALIDATION_ERROR',
                     'timestamp' => now()->toIso8601String(),
                 ], 422);
-                return $addCorsHeaders($response, $request);
+                $response = $addCorsHeaders($response, $request);
+                return $addCspHeaders($response);
             }
         });
         
         // Handle other exceptions for API routes
-        $exceptions->render(function (\Throwable $e, $request) use ($addCorsHeaders) {
+        $exceptions->render(function (\Throwable $e, $request) use ($addCorsHeaders, $addCspHeaders) {
             if ($request->is('api/*')) {
                 $response = response()->json([
                     'success' => false,
@@ -86,7 +115,8 @@ return Application::configure(basePath: dirname(__DIR__))
                     'error_code' => 'SERVER_ERROR',
                     'timestamp' => now()->toIso8601String(),
                 ], 500);
-                return $addCorsHeaders($response, $request);
+                $response = $addCorsHeaders($response, $request);
+                return $addCspHeaders($response);
             }
         });
     })->create();

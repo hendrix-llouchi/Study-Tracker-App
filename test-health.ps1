@@ -54,3 +54,4 @@ try {
     Write-Host "✗ Web health endpoint error: $($_.Exception.Message)" -ForegroundColor Red
 }
 
+
