@@ -25,6 +25,7 @@ desktop.ini
 # Logs
 *.log
 logs/
+.cursor/debug.log
 
 # Temporary files
 *.tmp
