@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
+use GuzzleHttp\Client;
 
 class AuthController extends Controller
 {
@@ -111,8 +112,13 @@ class AuthController extends Controller
             ]);
 
             // Verify the Google token using Socialite
+            // Configure HTTP client to handle SSL certificate issues on Windows/XAMPP
+            // Set SSL_VERIFY=true in production for security
             $googleUser = Socialite::driver('google')
                 ->stateless()
+                ->setHttpClient(new Client([
+                    'verify' => env('SSL_VERIFY', false), // false for development, true for production
+                ]))
                 ->userFromToken($request->token);
 
             // Check if user exists
