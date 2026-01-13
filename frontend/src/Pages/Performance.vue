@@ -42,8 +42,9 @@
           />
         </div>
 
-        <div class="lg:col-span-1">
+        <div class="lg:col-span-1 space-y-4">
           <BulkUploadCard @upload="handleBulkUpload" />
+          <BulkPdfUploadCard @upload="handleBulkPdfUpload" />
         </div>
       </div>
 
@@ -75,6 +76,7 @@ import WeakAreasCard from '@/Components/Performance/WeakAreasCard.vue'
 import PerformanceCharts from '@/Components/Performance/PerformanceCharts.vue'
 import ResultsList from '@/Components/Performance/ResultsList.vue'
 import BulkUploadCard from '@/Components/Performance/BulkUploadCard.vue'
+import BulkPdfUploadCard from '@/Components/Performance/BulkPdfUploadCard.vue'
 import HistoricalComparison from '@/Components/Performance/HistoricalComparison.vue'
 import ResultModal from '@/Components/Modals/ResultModal.vue'
 import { Plus } from 'lucide-vue-next'
@@ -140,10 +142,49 @@ const handleBulkUpload = async (file) => {
   try {
     await performanceStore.bulkUpload(file)
     // Results will be automatically refreshed in the store
+    alert('Results uploaded successfully!')
   } catch (error) {
     const errorMessage = getErrorMessage(error)
     console.error('Bulk upload failed:', error)
-    alert(errorMessage || 'Failed to upload results. Please check the file format.')
+    
+    // Show detailed errors if available
+    if (error.errors?.row_errors && Array.isArray(error.errors.row_errors)) {
+      const errorDetails = error.errors.row_errors.slice(0, 10).join('\n')
+      const moreErrors = error.errors.row_errors.length > 10 
+        ? `\n\n... and ${error.errors.row_errors.length - 10} more error(s)` 
+        : ''
+      alert(`Upload failed with the following errors:\n\n${errorDetails}${moreErrors}`)
+    } else if (error.errors) {
+      // Show all error details for debugging
+      const errorDetails = JSON.stringify(error.errors, null, 2)
+      console.error('Full error details:', errorDetails)
+      
+      // Check for missing columns error
+      if (error.errors.missing_columns) {
+        alert(`Upload failed: Missing required columns: ${error.errors.missing_columns.join(', ')}\n\n${error.message || ''}`)
+      } else if (error.errors.detected_columns) {
+        alert(`Upload failed: Could not detect required columns.\n\nDetected columns: ${error.errors.detected_columns.join(', ') || 'none'}\n\n${error.message || ''}`)
+      } else {
+        alert(`${errorMessage}\n\nFull error details logged to console.`)
+      }
+    } else {
+      alert(errorMessage || 'Failed to upload results. Please check the file format.')
+    }
+  }
+}
+
+const handleBulkPdfUpload = async (files, callbacks) => {
+  try {
+    // Use the new bulkStorePdfs method that extracts data from PDFs
+    await performanceStore.bulkStorePdfs(files, callbacks)
+  } catch (error) {
+    const errorMessage = getErrorMessage(error)
+    console.error('Bulk PDF upload failed:', error)
+    
+    // Errors are already handled by the component through callbacks
+    if (callbacks?.onError) {
+      callbacks.onError(errorMessage)
+    }
   }
 }
 </script>

@@ -21,21 +21,38 @@ export function getErrorMessage(error) {
   if (error.errors && typeof error.errors === 'object') {
     const errorMessages = []
     
-    // Handle Laravel validation errors (array format)
-    Object.keys(error.errors).forEach(key => {
-      const fieldErrors = Array.isArray(error.errors[key]) 
-        ? error.errors[key] 
-        : [error.errors[key]]
-      
-      fieldErrors.forEach(msg => {
-        if (msg && typeof msg === 'string') {
-          errorMessages.push(msg)
+    // Handle bulk upload row errors (array of error messages)
+    if (error.errors.row_errors && Array.isArray(error.errors.row_errors)) {
+      if (error.errors.row_errors.length > 0) {
+        // Show first 5 errors, then indicate if there are more
+        const maxErrors = 5
+        const errorsToShow = error.errors.row_errors.slice(0, maxErrors)
+        errorsToShow.forEach(msg => {
+          if (msg && typeof msg === 'string') {
+            errorMessages.push(msg)
+          }
+        })
+        if (error.errors.row_errors.length > maxErrors) {
+          errorMessages.push(`... and ${error.errors.row_errors.length - maxErrors} more error(s)`)
         }
+      }
+    } else {
+      // Handle Laravel validation errors (array format)
+      Object.keys(error.errors).forEach(key => {
+        const fieldErrors = Array.isArray(error.errors[key]) 
+          ? error.errors[key] 
+          : [error.errors[key]]
+        
+        fieldErrors.forEach(msg => {
+          if (msg && typeof msg === 'string') {
+            errorMessages.push(msg)
+          }
+        })
       })
-    })
+    }
     
     if (errorMessages.length > 0) {
-      return errorMessages.join('. ')
+      return errorMessages.join('\n')
     }
   }
 

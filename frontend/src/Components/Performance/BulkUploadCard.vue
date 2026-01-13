@@ -2,7 +2,7 @@
   <Card padding="default">
     <h3 class="text-h3 text-text-primary mb-4">Bulk Upload</h3>
     <p class="text-body-small text-text-secondary mb-4">
-      Upload multiple results at once using CSV or PDF files
+      Upload multiple results at once using CSV, TXT, or PDF files
     </p>
     
     <div
@@ -17,12 +17,12 @@
         Drop your file here or click to browse
       </p>
       <p class="text-body-small text-text-secondary mb-4">
-        Supports CSV, PDF (Max 10MB)
+        Supports CSV, TXT, and PDF files (Max 10MB)
       </p>
       <input
         ref="fileInput"
         type="file"
-        accept=".csv,.pdf"
+        accept=".csv,.txt,.pdf"
         class="hidden"
         @change="handleFileSelect"
       />
@@ -95,8 +95,19 @@ const handleFileSelect = (event) => {
 }
 
 const processFile = (file) => {
+  // Validate file size
   if (file.size > 10 * 1024 * 1024) {
     alert('File size must be less than 10MB')
+    return
+  }
+  
+  // Validate file extension
+  const fileName = file.name.toLowerCase()
+  const validExtensions = ['.csv', '.txt', '.pdf']
+  const fileExtension = fileName.substring(fileName.lastIndexOf('.'))
+  
+  if (!validExtensions.includes(fileExtension)) {
+    alert(`Invalid file type. Please upload a CSV, TXT, or PDF file. You uploaded: ${fileExtension || 'unknown type'}`)
     return
   }
   

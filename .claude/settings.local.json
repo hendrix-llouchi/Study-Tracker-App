@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php:*)",
+      "Bash(ls -la \"C:\\\\xampp\\\\htdocs\\\\Study-Tracker-App\\\\backend\\\\study_tracker_app\\\\app\\\\Http\\\\Requests\\\\Performance\"\" 2>nul || echo \"Directory not found \")"
+    ]
+  }
+}

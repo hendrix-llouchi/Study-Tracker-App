@@ -73,8 +73,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/results/{id}', [PerformanceController::class, 'update']);
         Route::delete('/results/{id}', [PerformanceController::class, 'destroy']);
         Route::post('/results/bulk', [PerformanceController::class, 'bulkUpload']);
+        Route::post('/results/bulk-pdfs', [PerformanceController::class, 'bulkUploadPdfs']);
         Route::get('/gpa-trend', [PerformanceController::class, 'gpaTrend']);
         Route::get('/subjects', [PerformanceController::class, 'subjects']);
+    });
+    
+    // Academic results routes
+    Route::prefix('academic-results')->group(function () {
+        Route::post('/bulk', [PerformanceController::class, 'bulkStore']);
     });
     
     // Study planning routes

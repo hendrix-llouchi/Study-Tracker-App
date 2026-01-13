@@ -257,11 +257,8 @@ export const usePerformanceStore = defineStore('performance', {
         const formData = new FormData()
         formData.append('file', file)
         
-        const response = await api.post('/performance/results/bulk', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        })
+        // Don't set Content-Type header - axios will set it automatically with boundary for FormData
+        const response = await api.post('/performance/results/bulk', formData)
         
         if (response.success) {
           // Refresh results after bulk upload
@@ -272,6 +269,142 @@ export const usePerformanceStore = defineStore('performance', {
         const errorMessage = getErrorMessage(error)
         console.error(formatErrorForLog('Failed to bulk upload results', error))
         this.error = errorMessage
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async bulkUploadPdfs(files, callbacks = {}) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const formData = new FormData()
+        
+        // Append each file to FormData with pdf_files[] array notation
+        files.forEach((file) => {
+          formData.append('pdf_files[]', file)
+        })
+
+        const totalFiles = files.length
+        let uploadedCount = 0
+
+        // Set up progress tracking
+        if (callbacks.onProgress) {
+          callbacks.onProgress(0, 0, totalFiles, 'Starting upload...')
+        }
+
+        // Don't set Content-Type header - axios will set it automatically with boundary for FormData
+        const response = await api.post('/performance/results/bulk-pdfs', formData, {
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+              if (callbacks.onProgress) {
+                callbacks.onProgress(percentCompleted, uploadedCount, totalFiles, 'Uploading files...')
+              }
+            }
+          }
+        })
+        
+        if (response.success) {
+          uploadedCount = response.data?.total_uploaded || 0
+          const errors = response.data?.errors || []
+
+          // Update progress to 100%
+          if (callbacks.onProgress) {
+            callbacks.onProgress(100, uploadedCount, totalFiles, 'Upload complete!')
+          }
+
+          // Call onComplete callback
+          if (callbacks.onComplete) {
+            callbacks.onComplete(uploadedCount, errors)
+          }
+
+          // Refresh results after bulk upload
+          await this.fetchResults()
+          return response.data
+        }
+      } catch (error) {
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to bulk upload PDFs', error))
+        this.error = errorMessage
+        
+        // Call onError callback
+        if (callbacks.onError) {
+          callbacks.onError(errorMessage)
+        }
+        
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async bulkStorePdfs(files, callbacks = {}) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const formData = new FormData()
+        
+        // Append each file to FormData with pdf_files[] array notation
+        files.forEach((file) => {
+          formData.append('pdf_files[]', file)
+        })
+
+        const totalFiles = files.length
+        let processedCount = 0
+
+        // Set up progress tracking - show "Analyzing Results..." during processing
+        if (callbacks.onProgress) {
+          callbacks.onProgress(0, 0, totalFiles, 'Analyzing Results...')
+        }
+
+        // Don't set Content-Type header - axios will set it automatically with boundary for FormData
+        const response = await api.post('/academic-results/bulk', formData, {
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+              if (callbacks.onProgress) {
+                // Show "Analyzing Results..." during upload
+                const status = percentCompleted < 100 
+                  ? 'Analyzing Results...' 
+                  : 'Processing PDFs...'
+                callbacks.onProgress(percentCompleted, processedCount, totalFiles, status)
+              }
+            }
+          }
+        })
+        
+        if (response.success) {
+          processedCount = response.data?.processed || 0
+          const errors = response.data?.errors || []
+
+          // Update progress to 100%
+          if (callbacks.onProgress) {
+            callbacks.onProgress(100, processedCount, totalFiles, 'Analysis complete!')
+          }
+
+          // Call onComplete callback
+          if (callbacks.onComplete) {
+            callbacks.onComplete(processedCount, errors)
+          }
+
+          // Refresh results after bulk processing
+          await this.fetchResults()
+          return response.data
+        }
+      } catch (error) {
+        const errorMessage = getErrorMessage(error)
+        console.error(formatErrorForLog('Failed to bulk store PDFs', error))
+        this.error = errorMessage
+        
+        // Call onError callback
+        if (callbacks.onError) {
+          callbacks.onError(errorMessage)
+        }
+        
         throw error
       } finally {
         this.loading = false

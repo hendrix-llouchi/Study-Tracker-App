@@ -20,12 +20,20 @@ apiClient.interceptors.request.use(
   config => {
     // Ensure method is preserved (axios should set this automatically, but we're being explicit)
     const method = config.method || 'get'
+    
+    // If data is FormData, remove Content-Type header to let axios set it with boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type']
+    }
+    
     console.log('Making request:', {
       method: method.toUpperCase(),
       url: config.url,
       baseURL: config.baseURL,
       fullURL: config.baseURL + config.url,
-      data: config.data ? (typeof config.data === 'object' ? JSON.stringify(config.data).substring(0, 100) : config.data) : undefined
+      data: config.data instanceof FormData 
+        ? `FormData (file: ${config.data.get('file')?.name || 'unknown'})`
+        : (config.data ? (typeof config.data === 'object' ? JSON.stringify(config.data).substring(0, 100) : config.data) : undefined)
     })
     const token = localStorage.getItem('token')
     if (token) {

@@ -25,6 +25,7 @@ class AcademicResult extends Model
         'semester',
         'date',
         'notes',
+        'file_path',
     ];
 
     protected function casts(): array
