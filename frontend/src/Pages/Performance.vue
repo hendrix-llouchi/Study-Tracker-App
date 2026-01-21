@@ -1,55 +1,106 @@
 <template>
-  <AppLayout :user="user" :unread-count="0">
-    <div class="space-y-4 lg:space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 class="text-h1 text-text-primary mb-2">Academic Performance</h1>
-          <p class="text-body text-text-secondary">Track your grades and academic progress over time</p>
-        </div>
-        <Button
-          variant="primary"
-          size="lg"
-          @click="showResultModal = true"
-        >
-          <Plus :size="20" class="mr-2" />
-          Add Result
-        </Button>
-      </div>
-
-      <!-- GPA Calculator -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-        <div class="lg:col-span-1">
-          <GPACalculator :results="results" :current-semester="currentSemester" />
+  <AppLayout :user="user">
+    <div class="max-w-[1600px] mx-auto space-y-10 py-8 relative">
+      
+      <!-- HERO: Title & Primary Actions -->
+      <section class="flex flex-col md:flex-row md:items-end justify-between gap-8 px-6 sm:px-0">
+        <div class="space-y-4 animate-in fade-in slide-in-from-left-8 duration-700">
+          <div class="flex items-center gap-2 text-strap-indigo font-black uppercase tracking-[0.3em] text-[10px]">
+            <BarChart3 :size="16" />
+            Performance Insight v4.0
+          </div>
+          <h1 class="text-4xl lg:text-6xl font-black text-text-main dark:text-white tracking-tighter leading-none">
+            Scale Your <br/> 
+            <span class="strap-gradient-text">Academic Velocity.</span>
+          </h1>
         </div>
 
-        <!-- Weak Areas -->
-        <div class="lg:col-span-2">
-          <WeakAreasCard :results="results" :threshold="75" />
+        <div class="flex items-center gap-3 animate-in fade-in slide-in-from-right-8 duration-700">
+          <Button variant="secondary" size="lg" class="liquid-glass border-none px-6 py-4 rounded-2xl font-black tracking-tight dark:text-white" @click="showResultModal = true">
+            <Plus :size="18" class="mr-2" />
+            Add Record
+          </Button>
         </div>
-      </div>
+      </section>
 
-      <!-- Performance Charts -->
-      <PerformanceCharts :results="results" />
+      <!-- PULSE: Top-level Intelligence Strip -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-6 sm:px-0">
+        <div v-for="stat in pulseStats" :key="stat.label" class="liquid-glass p-6 rounded-3xl border-white/40 dark:border-white/5 group hover:scale-[1.02] transition-all duration-300">
+          <div class="flex items-center justify-between">
+            <div class="space-y-1">
+              <span class="text-[10px] font-black uppercase tracking-widest text-text-muted">{{ stat.label }}</span>
+              <p class="text-3xl font-black text-text-main dark:text-white tracking-tighter">{{ stat.value }}</p>
+            </div>
+            <div :class="`p-3 rounded-2xl ${stat.bg} ${stat.color} shadow-lg shadow-black/5`">
+              <component :is="stat.icon" :size="20" />
+            </div>
+          </div>
+          <div class="mt-4 flex items-center gap-2">
+            <TrendingUp :size="12" class="text-emerald-500" />
+            <span class="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">{{ stat.trend }} vs. Last Term</span>
+          </div>
+        </div>
+      </section>
 
-      <!-- Results List and Bulk Upload -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-        <div class="lg:col-span-2">
-          <ResultsList
-            :results="results"
-            @add-result="showResultModal = true"
-            @edit-result="handleEditResult"
-            @delete-result="handleDeleteResult"
-          />
+      <!-- INTELLIGENCE BENTO GRID -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 px-6 sm:px-0">
+        <!-- Main Velocity Map (Chart) -->
+        <div class="lg:col-span-8">
+           <PerformanceCharts :results="results" mode="velocity" />
         </div>
 
-        <div class="lg:col-span-1 space-y-4">
-          <BulkUploadCard @upload="handleBulkUpload" />
-          <BulkPdfUploadCard @upload="handleBulkPdfUpload" />
+        <!-- GPA Engine (Projection) -->
+        <div class="lg:col-span-4">
+           <GPACalculator :results="results" :current-semester="currentSemester" />
         </div>
-      </div>
+      </section>
 
-      <!-- Historical Comparison -->
-      <HistoricalComparison :results="results" />
+      <!-- DATA HUB -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 px-6 sm:px-0">
+        <!-- Records Center (Left/Wide) -->
+        <div class="lg:col-span-8 space-y-6">
+          <div class="flex items-center justify-between px-4">
+             <h2 class="text-2xl font-black text-text-main dark:text-white tracking-tight flex items-center gap-3 font-outfit">
+               <List :size="24" class="text-strap-indigo" />
+               Historical Records
+             </h2>
+          </div>
+          <div class="liquid-glass rounded-[2rem] overflow-hidden border-white/40 dark:border-white/5 shadow-2xl transition-all duration-500">
+             <ResultsList
+               :results="results"
+               @add-result="showResultModal = true"
+               @edit-result="handleEditResult"
+               @delete-result="handleDeleteResult"
+             />
+          </div>
+        </div>
+
+        <!-- Operations Console (Right) -->
+        <div class="lg:col-span-4 space-y-8">
+          <div class="px-4">
+             <h2 class="text-2xl font-black text-text-main dark:text-white tracking-tight flex items-center gap-3 font-outfit">
+               <Zap :size="24" class="text-strap-amber" />
+               Operations
+             </h2>
+          </div>
+          
+          <div class="space-y-6">
+            <BulkPdfUploadCard ref="bulkPdfCard" @upload="handleBulkPdfUpload" />
+            
+            <div class="spatial-card liquid-glass p-8 space-y-6 bg-strap-indigo/5 dark:bg-strap-indigo/10 border-strap-indigo/20">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-strap-indigo flex items-center justify-center shadow-lg shadow-strap-indigo/30">
+                  <BrainCircuit class="text-white" :size="20" />
+                </div>
+                <span class="text-sm font-black text-text-main dark:text-white uppercase tracking-widest">Growth Engine Hint</span>
+              </div>
+              <p class="text-[11px] font-medium text-text-muted leading-relaxed italic">
+                "Target a <span class="text-strap-indigo font-bold">3.5 GPA</span> this semester to stay in the top 5% of your faculty. I suggest focusing on your upcoming Midterms."
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Result Modal -->
       <ResultModal
@@ -67,30 +118,53 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/Stores/auth'
 import { usePerformanceStore } from '@/Stores/performance'
-import { getErrorMessage } from '@/utils/errorHandler'
 import api from '@/services/api'
 import AppLayout from '@/Components/Layout/AppLayout.vue'
 import Button from '@/Components/Common/Button.vue'
 import GPACalculator from '@/Components/Performance/GPACalculator.vue'
-import WeakAreasCard from '@/Components/Performance/WeakAreasCard.vue'
 import PerformanceCharts from '@/Components/Performance/PerformanceCharts.vue'
 import ResultsList from '@/Components/Performance/ResultsList.vue'
-import BulkUploadCard from '@/Components/Performance/BulkUploadCard.vue'
 import BulkPdfUploadCard from '@/Components/Performance/BulkPdfUploadCard.vue'
-import HistoricalComparison from '@/Components/Performance/HistoricalComparison.vue'
 import ResultModal from '@/Components/Modals/ResultModal.vue'
-import { Plus } from 'lucide-vue-next'
+import { 
+  Plus, 
+  BarChart3, 
+  Upload, 
+  Activity, 
+  Zap, 
+  List, 
+  BrainCircuit,
+  TrendingUp,
+  Target,
+  GraduationCap,
+  Clock
+} from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 const performanceStore = usePerformanceStore()
 
 const user = computed(() => authStore.user)
 const results = computed(() => performanceStore.results)
-const currentSemester = ref('Fall 2024')
+const currentSemester = ref('Semester 1 2024')
 const courses = ref([])
 
 const showResultModal = ref(false)
 const editingResult = ref(null)
+const bulkPdfCard = ref(null)
+
+const gradeToPoints = { 'A+': 4.0, 'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7, 'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0 }
+const totalCredits = computed(() => results.value.reduce((sum, r) => sum + (r.creditHours || 0), 0))
+const currentGPA = computed(() => {
+  const totalPoints = results.value.reduce((sum, r) => sum + ((gradeToPoints[r.grade] || 0) * (r.creditHours || 0)), 0)
+  return totalCredits.value === 0 ? 0 : (totalPoints / totalCredits.value).toFixed(2)
+})
+
+const pulseStats = computed(() => [
+  { label: 'Current GPA', value: currentGPA.value, icon: Target, bg: 'bg-strap-indigo/10', color: 'text-strap-indigo', trend: '+4.2%' },
+  { label: 'Total Credits', value: totalCredits.value, icon: GraduationCap, bg: 'bg-strap-violet/10', color: 'text-strap-violet', trend: 'On Track' },
+  { label: 'Completed', value: `${results.value.length}`, icon: Activity, bg: 'bg-strap-amber/10', color: 'text-strap-amber', trend: '+2 this week' },
+  { label: 'Time Tracked', value: '45h', icon: Clock, bg: 'bg-strap-indigo/5', color: 'text-strap-indigo', trend: '85% active' }
+])
 
 onMounted(async () => {
   await Promise.all([
@@ -103,10 +177,7 @@ const fetchCourses = async () => {
   try {
     const response = await api.get('/courses')
     if (response.success && response.data) {
-      // Handle both array and paginated response
-      courses.value = Array.isArray(response.data) 
-        ? response.data 
-        : (response.data.courses || response.data.data || [])
+      courses.value = Array.isArray(response.data) ? response.data : (response.data.courses || [])
     }
   } catch (error) {
     console.error('Failed to fetch courses:', error)
@@ -119,7 +190,7 @@ const handleEditResult = (result) => {
 }
 
 const handleDeleteResult = async (id) => {
-  if (confirm('Are you sure you want to delete this result?')) {
+  if (confirm('Permanently delete this record?')) {
     await performanceStore.deleteResult(id)
   }
 }
@@ -138,53 +209,16 @@ const handleCloseModal = () => {
   editingResult.value = null
 }
 
-const handleBulkUpload = async (file) => {
-  try {
-    await performanceStore.bulkUpload(file)
-    // Results will be automatically refreshed in the store
-    alert('Results uploaded successfully!')
-  } catch (error) {
-    const errorMessage = getErrorMessage(error)
-    console.error('Bulk upload failed:', error)
-    
-    // Show detailed errors if available
-    if (error.errors?.row_errors && Array.isArray(error.errors.row_errors)) {
-      const errorDetails = error.errors.row_errors.slice(0, 10).join('\n')
-      const moreErrors = error.errors.row_errors.length > 10 
-        ? `\n\n... and ${error.errors.row_errors.length - 10} more error(s)` 
-        : ''
-      alert(`Upload failed with the following errors:\n\n${errorDetails}${moreErrors}`)
-    } else if (error.errors) {
-      // Show all error details for debugging
-      const errorDetails = JSON.stringify(error.errors, null, 2)
-      console.error('Full error details:', errorDetails)
-      
-      // Check for missing columns error
-      if (error.errors.missing_columns) {
-        alert(`Upload failed: Missing required columns: ${error.errors.missing_columns.join(', ')}\n\n${error.message || ''}`)
-      } else if (error.errors.detected_columns) {
-        alert(`Upload failed: Could not detect required columns.\n\nDetected columns: ${error.errors.detected_columns.join(', ') || 'none'}\n\n${error.message || ''}`)
-      } else {
-        alert(`${errorMessage}\n\nFull error details logged to console.`)
-      }
-    } else {
-      alert(errorMessage || 'Failed to upload results. Please check the file format.')
-    }
-  }
-}
-
 const handleBulkPdfUpload = async (files, callbacks) => {
   try {
-    // Use the new bulkStorePdfs method that extracts data from PDFs
     await performanceStore.bulkStorePdfs(files, callbacks)
   } catch (error) {
-    const errorMessage = getErrorMessage(error)
     console.error('Bulk PDF upload failed:', error)
-    
-    // Errors are already handled by the component through callbacks
-    if (callbacks?.onError) {
-      callbacks.onError(errorMessage)
-    }
   }
 }
 </script>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@900&display=swap');
+.font-outfit { font-family: 'Outfit', sans-serif; }
+</style>

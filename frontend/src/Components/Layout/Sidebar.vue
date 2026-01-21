@@ -1,143 +1,136 @@
 <template>
   <!-- Mobile Overlay -->
-  <div
-    v-if="isMobileMenuOpen"
-    class="fixed inset-0 bg-black/50 z-40 lg:hidden"
-    @click="closeMobileMenu"
-  ></div>
+  <Transition name="fade">
+    <div v-if="isMobileMenuOpen" class="fixed inset-0 bg-strap-navy/60 backdrop-blur-sm z-[50] lg:hidden" @click="closeMobileMenu"></div>
+  </Transition>
 
   <!-- Sidebar -->
-  <aside
+  <aside 
     :class="sidebarClasses"
-    class="fixed left-0 top-0 h-screen bg-neutral-white border-r border-border-default z-50 transition-transform duration-default lg:translate-x-0"
+    class="fixed left-0 top-0 h-screen w-64 bg-bg-secondary border-r border-white/10 dark:border-white/5 z-[60] transition-all duration-500 lg:translate-x-0 group"
   >
-    <!-- Logo -->
-    <div class="px-4 py-4 lg:py-6 mb-6 border-b border-border-default">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <div class="w-8 h-8 bg-primary-green rounded-md flex items-center justify-center flex-shrink-0">
-            <span class="text-white font-bold text-lg">E</span>
-          </div>
-          <span class="ml-3 text-lg font-semibold text-text-primary">Edupro</span>
-        </div>
-        <button
-          @click="closeMobileMenu"
-          class="lg:hidden p-1 rounded-md hover:bg-neutral-gray100"
-        >
-          <X :size="20" class="text-text-secondary" />
-        </button>
-      </div>
+    <!-- Background Texture -->
+    <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.07] pointer-events-none overflow-hidden">
+      <div class="absolute -top-1/2 -left-1/2 w-full h-full bg-strap-indigo blur-[100px] rounded-full"></div>
     </div>
 
-    <!-- Navigation -->
-    <nav class="px-2 overflow-y-auto h-[calc(100vh-100px)]">
-      <div v-for="section in navigationSections" :key="section.label" class="mb-6">
-        <div v-if="section.label" class="px-4 mb-2">
-          <span class="text-caption font-semibold text-text-tertiary uppercase tracking-wider">
+    <div class="relative h-full flex flex-col p-6">
+      <!-- Logo Section -->
+      <div class="mb-12">
+        <Logo />
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 space-y-8 overflow-y-auto scrollbar-hide">
+        <div v-for="section in navGroups" :key="section.label">
+          <h3 class="px-4 mb-4 text-[10px] font-black uppercase tracking-[0.3em] text-text-muted opacity-50">
             {{ section.label }}
-          </span>
+          </h3>
+          <div class="space-y-1">
+            <router-link
+              v-for="item in section.items"
+              :key="item.to"
+              :to="item.to"
+              v-slot="{ isActive }"
+              @click="closeMobileMenu"
+            >
+              <div 
+                :class="[
+                  isActive 
+                    ? 'bg-strap-indigo shadow-lg shadow-strap-indigo/25 text-white' 
+                    : 'text-text-muted hover:bg-strap-indigo/5 hover:text-text-main dark:hover:text-white'
+                ]"
+                class="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 group/nav"
+              >
+                <component 
+                  :is="item.icon" 
+                  :size="20" 
+                  :class="[isActive ? 'text-white' : 'text-text-muted group-hover/nav:text-strap-indigo']"
+                  class="transition-colors duration-300"
+                />
+                <span class="text-sm font-bold tracking-tight">{{ item.label }}</span>
+                
+                <div v-if="isActive" class="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+              </div>
+            </router-link>
+          </div>
         </div>
-        <div v-for="item in section.items" :key="item.to">
-          <router-link
-            :to="item.to"
-            :class="navItemClasses(item)"
-            class="flex items-center gap-3 px-4 py-3 mb-1 rounded-md transition-all duration-default min-h-[44px]"
-            @click="closeMobileMenu"
-          >
-            <component :is="item.icon" :size="20" :class="iconClasses(item)" class="flex-shrink-0" />
-            <span class="text-body font-medium">{{ item.label }}</span>
-            <Badge v-if="item.badge" variant="info" size="sm" class="ml-auto flex-shrink-0">
-              {{ item.badge }}
-            </Badge>
-          </router-link>
+      </nav>
+
+      <!-- Bottom Profile Preview -->
+      <div class="mt-auto pt-6 border-t border-white/10 dark:border-white/5">
+        <div class="liquid-glass p-4 rounded-2xl flex items-center gap-3 active:scale-95 transition-transform">
+          <div class="w-10 h-10 rounded-xl strap-gradient-bg flex items-center justify-center font-black text-white text-xs shadow-lg">
+            ST
+          </div>
+          <div class="flex flex-col min-w-0">
+            <span class="text-xs font-black text-text-main dark:text-white truncate">Standard Plan</span>
+            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">v2.4.0-liquid</span>
+          </div>
         </div>
       </div>
-    </nav>
+    </div>
   </aside>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-import {
-  LayoutDashboard,
-  BarChart3,
-  Calendar,
-  Clock,
-  BookOpen,
-  TrendingUp,
-  PieChart,
-  MessageSquare,
-  Settings,
+import { 
+  LayoutDashboard, 
+  BarChart3, 
+  Calendar, 
+  Clock, 
+  BookOpen, 
+  TrendingUp, 
+  PieChart, 
+  MessageSquare, 
+  Settings, 
   HelpCircle,
-  X
+  X 
 } from 'lucide-vue-next'
-import Badge from '@/Components/Common/Badge.vue'
+import Logo from '@/Components/Common/Logo.vue'
 
 const props = defineProps({
-  isMobileMenuOpen: {
-    type: Boolean,
-    default: false
-  }
+  isMobileMenuOpen: Boolean
 })
 
 const emit = defineEmits(['close-mobile-menu'])
 
-const route = useRoute()
-
-const navigationSections = [
+const navGroups = [
   {
+    label: 'Main Ops',
     items: [
-      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { to: '/performance', label: 'Performance', icon: BarChart3 },
-      { to: '/planning', label: 'Planning', icon: Calendar },
-      { to: '/timetable', label: 'Timetable', icon: Clock },
-      { to: '/assignments', label: 'Assignments', icon: BookOpen }
+      { to: '/dashboard', label: 'Command Center', icon: LayoutDashboard },
+      { to: '/performance', label: 'Performance Hub', icon: BarChart3 },
+      { to: '/planning', label: 'Course Planning', icon: Calendar },
+      { to: '/timetable', label: 'Live Timetable', icon: Clock }
     ]
   },
   {
-    label: 'Insights',
+    label: 'Analytics',
     items: [
-      { to: '/progress/weekly', label: 'Weekly Reports', icon: TrendingUp },
-      { to: '/progress/analytics', label: 'Analytics', icon: PieChart },
-      { to: '/ai-coach', label: 'AI Coach', icon: MessageSquare, badge: 'New' }
+      { to: '/progress/analytics', label: 'Growth Reports', icon: PieChart },
+      { to: '/ai-coach', label: 'AI Study Coach', icon: MessageSquare }
     ]
   },
   {
-    label: 'Settings',
+    label: 'System',
     items: [
-      { to: '/settings', label: 'Settings', icon: Settings },
-      { to: '/help', label: 'Help', icon: HelpCircle }
+      { to: '/settings', label: 'Config', icon: Settings },
+      { to: '/help', label: 'Support', icon: HelpCircle }
     ]
   }
 ]
 
 const sidebarClasses = computed(() => {
-  let classes = 'w-64 lg:w-60'
-  
-  if (props.isMobileMenuOpen) {
-    classes += ' translate-x-0'
-  } else {
-    classes += ' -translate-x-full lg:translate-x-0'
-  }
-  
-  return classes
+  return props.isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
 })
 
-const closeMobileMenu = () => {
-  emit('close-mobile-menu')
-}
-
-const navItemClasses = (item) => {
-  const isActive = route.path === item.to
-  if (isActive) {
-    return 'bg-primary-green-bg text-text-success border-l-3 border-l-primary-green pl-3'
-  }
-  return 'text-text-secondary hover:bg-neutral-gray100 hover:text-text-primary'
-}
-
-const iconClasses = (item) => {
-  const isActive = route.path === item.to
-  return isActive ? 'text-primary-green' : 'text-neutral-gray400'
-}
+const closeMobileMenu = () => emit('close-mobile-menu')
 </script>
+
+<style scoped>
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+</style>

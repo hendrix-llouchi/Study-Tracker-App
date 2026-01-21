@@ -1,105 +1,70 @@
 <template>
-  <header class="fixed top-0 right-0 left-0 lg:left-60 bg-neutral-white border-b border-border-default z-30">
-    <div class="px-4 lg:px-8 py-3 lg:py-4 flex items-center justify-between">
-      <!-- Left: Mobile Menu Button + Breadcrumbs -->
-      <div class="flex items-center gap-3 lg:gap-2 flex-1 min-w-0">
+  <header class="fixed top-0 right-0 left-0 lg:left-64 z-40 px-6 py-4">
+    <div class="max-w-[1600px] mx-auto liquid-glass rounded-2xl px-6 py-3 flex items-center justify-between border-white/20 dark:border-white/5 shadow-lg">
+      
+      <!-- Left: Mobile Menu + Breadcrumbs -->
+      <div class="flex items-center gap-4">
         <button
           @click="$emit('toggle-mobile-menu')"
-          class="lg:hidden p-2 rounded-md hover:bg-neutral-gray100 transition-colors duration-default min-w-[44px] min-h-[44px] flex items-center justify-center"
-          aria-label="Toggle menu"
+          class="lg:hidden p-2 rounded-xl hover:bg-white/20 dark:hover:bg-white/5 transition-all"
         >
-          <Menu :size="20" class="text-text-secondary" />
+          <Menu :size="20" class="text-text-main dark:text-white" />
         </button>
         
-        <div class="hidden md:flex items-center gap-2 min-w-0">
+        <div class="hidden md:block">
           <Breadcrumbs />
-        </div>
-        <div class="md:hidden">
-          <span class="text-body-small font-medium text-text-primary truncate">
-            {{ currentPageTitle }}
-          </span>
         </div>
       </div>
 
-      <!-- Right: Search, Notifications, User -->
-      <div class="flex items-center gap-2 lg:gap-4 flex-shrink-0">
-        <!-- Search Bar -->
-        <div class="relative hidden md:block">
-          <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-tertiary" />
+      <!-- Right: Search, Theme, User -->
+      <div class="flex items-center gap-4">
+        <!-- Premium Search Bar -->
+        <div class="relative hidden lg:block group">
+          <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-strap-indigo transition-colors" />
           <input
             type="text"
-            placeholder="Search..."
-            class="pl-10 pr-4 py-2 w-48 lg:w-64 bg-neutral-gray50 border border-border-default rounded-md text-body text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-border-focus/10 focus:border-border-focus transition-all duration-default"
+            placeholder="Command Search (⌘K)"
+            class="pl-10 pr-4 py-2 w-64 bg-white/50 dark:bg-white/5 border border-transparent focus:border-strap-indigo/30 rounded-xl text-xs font-bold focus:outline-none transition-all"
           />
         </div>
 
-        <!-- Mobile Search Button -->
-        <button
-          class="md:hidden p-2 rounded-md hover:bg-neutral-gray100 transition-colors duration-default min-w-[44px] min-h-[44px] flex items-center justify-center"
-          @click="$emit('toggle-search')"
+        <!-- Theme Toggle -->
+        <button 
+          @click="toggleTheme" 
+          class="p-2.5 rounded-xl bg-white/50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 text-text-muted hover:text-strap-indigo transition-all ring-1 ring-white/20"
         >
-          <Search class="w-5 h-5 text-text-secondary" />
+          <Sun v-if="isDark" :size="18" />
+          <Moon v-else :size="18" />
         </button>
 
-        <!-- Notifications -->
-        <button class="relative p-2 rounded-md hover:bg-neutral-gray100 transition-colors duration-default min-w-[44px] min-h-[44px] flex items-center justify-center">
-          <Bell class="w-5 h-5 text-text-secondary" />
-          <span
-            v-if="unreadCount > 0"
-            class="absolute top-1 right-1 w-2 h-2 bg-accent-red rounded-full"
-          ></span>
-        </button>
+        <!-- User Profile Dropdown -->
+        <div class="relative flex items-center gap-3 p-1 pl-3 rounded-xl bg-white/50 dark:bg-white/5 border border-white/20 dark:border-white/5">
+           <div class="hidden sm:flex flex-col items-end">
+             <span class="text-xs font-black text-text-main dark:text-white leading-none">{{ user?.name || 'Scholar' }}</span>
+             <span class="text-[9px] font-black uppercase tracking-widest text-strap-indigo">Pro Member</span>
+           </div>
+           
+           <div class="relative group" ref="dropdownRef">
+             <button @click="toggleDropdown" class="w-9 h-9 rounded-xl overflow-hidden bg-strap-indigo/10 border-2 border-white dark:border-white/5 shadow-inner">
+               <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" />
+               <span v-else class="text-xs font-black text-strap-indigo">{{ userInitials }}</span>
+             </button>
 
-        <!-- User Dropdown -->
-        <div class="relative" ref="dropdownRef">
-          <button
-            @click="toggleDropdown"
-            class="flex items-center gap-2 lg:gap-3 p-1.5 lg:p-2 rounded-md hover:bg-neutral-gray100 transition-colors duration-default min-w-[44px] min-h-[44px]"
-          >
-            <div class="w-8 h-8 lg:w-10 lg:h-10 rounded-full border-2 border-border-default overflow-hidden bg-neutral-gray200 flex-shrink-0">
-              <img
-                v-if="user?.avatar"
-                :src="user.avatar"
-                :alt="user.name"
-                class="w-full h-full object-cover"
-              />
-              <div v-else class="w-full h-full flex items-center justify-center text-text-secondary font-medium text-sm">
-                {{ userInitials }}
-              </div>
-            </div>
-            <ChevronDown class="w-4 h-4 text-text-secondary hidden lg:block" />
-          </button>
-
-          <!-- Dropdown Menu -->
-          <div
-            v-if="showDropdown"
-            class="absolute right-0 mt-2 w-48 bg-neutral-white border border-border-default rounded-lg shadow-lg py-1 z-50"
-          >
-            <router-link
-              to="/settings#profile"
-              class="flex items-center gap-2 px-4 py-2.5 text-body text-text-primary hover:bg-neutral-gray100 transition-colors duration-default min-h-[44px]"
-              @click="handleProfileClick"
-            >
-              <User class="w-4 h-4" />
-              Profile
-            </router-link>
-            <router-link
-              to="/settings"
-              class="flex items-center gap-2 px-4 py-2.5 text-body text-text-primary hover:bg-neutral-gray100 transition-colors duration-default min-h-[44px]"
-              @click="closeDropdown"
-            >
-              <Settings class="w-4 h-4" />
-              Settings
-            </router-link>
-            <div class="border-t border-border-default my-1"></div>
-            <button
-              @click="handleLogout"
-              class="w-full flex items-center gap-2 px-4 py-2.5 text-body text-text-primary hover:bg-neutral-gray100 transition-colors duration-default min-h-[44px]"
-            >
-              <LogOut class="w-4 h-4" />
-              Logout
-            </button>
-          </div>
+             <!-- Dropdown (Spatial) -->
+             <div v-if="showDropdown" class="absolute right-0 mt-4 w-56 liquid-glass rounded-2xl p-2 border-none shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                <router-link v-for="link in dropdownLinks" :key="link.to" :to="link.to" 
+                             class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-strap-indigo/10 dark:hover:bg-white/5 text-sm font-bold text-text-main dark:text-white transition-all"
+                             @click="closeDropdown"
+                >
+                  <component :is="link.icon" :size="18" class="text-strap-indigo" />
+                  {{ link.label }}
+                </router-link>
+                <div class="h-px bg-white/20 dark:bg-white/5 my-2 mx-2"></div>
+                <button @click="handleLogout" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-sm font-bold text-red-500 transition-all">
+                  <LogOut :size="18" /> Logout
+                </button>
+             </div>
+           </div>
         </div>
       </div>
     </div>
@@ -108,82 +73,50 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { Search, Bell, ChevronDown, User, Settings, LogOut, Menu } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Menu, Search, Sun, Moon, User, Settings, LogOut, ChevronDown } from 'lucide-vue-next'
 import Breadcrumbs from '@/Components/Common/Breadcrumbs.vue'
 
 const props = defineProps({
-  user: {
-    type: Object,
-    default: () => ({})
-  },
-  unreadCount: {
-    type: Number,
-    default: 0
-  }
+  user: Object,
+  unreadCount: Number
 })
 
-const emit = defineEmits(['logout', 'toggle-mobile-menu', 'toggle-search'])
+const emit = defineEmits(['logout', 'toggle-mobile-menu'])
 
-const router = useRouter()
-const route = useRoute()
 const showDropdown = ref(false)
 const dropdownRef = ref(null)
+const isDark = ref(false)
 
 const userInitials = computed(() => {
-  if (!props.user?.name) return 'U'
-  const names = props.user.name.split(' ')
-  return names.map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  if (!props.user?.name) return 'S'
+  return props.user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 })
 
-const currentPageTitle = computed(() => {
-  const path = route.path
-  const segments = path.split('/').filter(Boolean)
-  if (segments.length === 0) return 'Dashboard'
-  const lastSegment = segments[segments.length - 1]
-  return lastSegment
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-})
+const dropdownLinks = [
+  { label: 'Profile Settings', to: '/settings', icon: User },
+  { label: 'System Prefs', to: '/settings', icon: Settings }
+]
 
-const toggleDropdown = () => {
-  showDropdown.value = !showDropdown.value
+const toggleTheme = () => {
+  isDark.value = !isDark.value
+  document.documentElement.classList.toggle('dark', isDark.value)
+  localStorage.theme = isDark.value ? 'dark' : 'light'
 }
 
-const closeDropdown = () => {
-  showDropdown.value = false
-}
+const toggleDropdown = () => showDropdown.value = !showDropdown.value
+const closeDropdown = () => showDropdown.value = false
+const handleLogout = () => { emit('logout'); closeDropdown() }
 
-const handleProfileClick = () => {
-  closeDropdown()
-  // If already on settings page, scroll to profile section
-  if (route.path === '/settings') {
-    setTimeout(() => {
-      const profileSection = document.getElementById('profile-section')
-      if (profileSection) {
-        profileSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-    }, 100)
-  }
-}
-
-const handleLogout = () => {
-  closeDropdown()
-  emit('logout')
-}
-
-const handleClickOutside = (event) => {
-  if (dropdownRef.value && !dropdownRef.value.contains(event.target)) {
-    closeDropdown()
-  }
+const handleClickOutside = (e) => {
+  if (dropdownRef.value && !dropdownRef.value.contains(e.target)) closeDropdown()
 }
 
 onMounted(() => {
+  isDark.value = localStorage.theme === 'dark' || (!localStorage.theme && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  document.documentElement.classList.toggle('dark', isDark.value)
   document.addEventListener('click', handleClickOutside)
 })
 
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
+onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 </script>

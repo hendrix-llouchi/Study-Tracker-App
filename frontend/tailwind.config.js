@@ -4,9 +4,21 @@ export default {
     "./index.html",
     "./src/**/*.{vue,js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        // Brand Colors (Premium & Trend-Aware)
+        brand: {
+          primary: '#4F46E5', // Indigo
+          secondary: '#7C3AED', // Violet
+          accent: '#F59E0B', // Amber/Orange
+          dark: '#0F172A', // Slate 900
+          surface: '#1E293B', // Slate 800
+          'glass-bg': 'rgba(30, 41, 59, 0.7)',
+          'glass-dark': 'rgba(15, 23, 42, 0.4)',
+          'glass-border': 'rgba(255, 255, 255, 0.1)',
+        },
         // Primary Colors
         primary: {
           green: '#34D399',

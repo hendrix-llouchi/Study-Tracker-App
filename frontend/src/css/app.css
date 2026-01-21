@@ -2,55 +2,166 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 
+  STRAP Design System 2026: Liquid Spatial UI
+  Focus: Depth, Translucency, and High-Fidelity Motion
+*/
+
+:root {
+  /* Core Palette */
+  --strap-indigo: #6366f1;
+  --strap-violet: #8b5cf6;
+  --strap-amber: #f59e0b;
+  --strap-navy: #0f172a;
+  --strap-slate: #1e293b;
+
+  /* Semantic Colors - Light Mode */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --accent-glow: rgba(99, 102, 241, 0.15);
+}
+
+.dark {
+  /* Semantic Colors - Dark Mode */
+  --bg-primary: #020617;
+  --bg-secondary: #0f172a;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --glass-bg: rgba(15, 23, 42, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --accent-glow: rgba(139, 92, 246, 0.2);
+}
+
 @layer base {
-  * {
-    @apply border-border-default;
-  }
-  
   body {
-    @apply bg-neutral-gray50 text-text-primary font-primary;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    /* Prevent horizontal scroll on mobile */
+    background-color: var(--bg-primary);
+    background-image: radial-gradient(circle at top right, var(--accent-glow), transparent), url('/images/premium_bg.png');
+    background-attachment: fixed;
+    background-size: cover;
+    background-blend-mode: overlay;
+    color: var(--text-main);
+    font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  h1 {
-    @apply text-h1;
-  }
-
-  h2 {
-    @apply text-h2;
-  }
-
-  h3 {
-    @apply text-h3;
-  }
-
-  p {
-    @apply text-body;
-  }
-
-  /* Ensure touch targets are at least 44x44px on mobile */
-  @media (max-width: 768px) {
-    button, a, [role="button"] {
-      min-height: 44px;
-      min-width: 44px;
-    }
+  /* Smooth scrolling for the whole page */
+  html {
+    scroll-behavior: smooth;
   }
 }
 
 @layer components {
-  /* Custom component styles can go here */
-  .touch-target {
-    @apply min-h-[44px] min-w-[44px];
+
+  /* LIQUID GLASS: The cornerstone of 2026 UI */
+  .liquid-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  .liquid-glass:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  /* SPATIAL DEPTH: Layering elements */
+  .spatial-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 2rem;
+    z-index: 1;
+  }
+
+  .spatial-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, var(--accent-glow), transparent);
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* BENTO GRID UTILITIES */
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* PREMIUM GRADIENTS */
+  .strap-gradient-text {
+    background: linear-gradient(135deg, var(--strap-indigo), var(--strap-violet));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .strap-gradient-bg {
+    background: linear-gradient(135deg, var(--strap-indigo), var(--strap-violet));
   }
 }
 
 @layer utilities {
-  /* Custom utility classes can go here */
-  .container-responsive {
-    @apply w-full px-4 sm:px-6 lg:px-8;
-    max-width: 1440px;
-    margin: 0 auto;
+
+  /* MICRO-ANIMATIONS */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
   }
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-glow {
+    animation: glow 4s infinite alternate;
+  }
+
+  @keyframes glow {
+    from {
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    to {
+      box-shadow: 0 0 30px var(--accent-glow);
+    }
+  }
+
+  .mask-liquid {
+    mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+  }
+}
+
+/* CUSTOM SCROLLBAR: Premium Feel */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 10px;
+  opacity: 0.3;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--strap-indigo);
 }

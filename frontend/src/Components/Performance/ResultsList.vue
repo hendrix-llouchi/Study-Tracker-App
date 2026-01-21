@@ -1,126 +1,85 @@
 <template>
-  <Card padding="default">
-    <div class="flex items-center justify-between mb-5">
-      <h3 class="text-h3 text-text-primary">Academic Results</h3>
-      <Button variant="primary" size="md" @click="$emit('add-result')">
-        <Plus :size="16" class="mr-2" />
-        Add Result
+  <div class="space-y-4">
+    <div v-if="results.length === 0" class="liquid-glass p-20 text-center rounded-[2rem] border-dashed border-strap-indigo/20">
+      <FileText class="w-16 h-16 text-strap-indigo/20 mx-auto mb-6 animate-pulse" />
+      <h3 class="text-xl font-black text-text-main dark:text-white mb-2">No Records Found</h3>
+      <p class="text-sm font-medium text-text-muted mb-8">Synchronize your transcripts or add manual markers to begin.</p>
+      <Button variant="primary" size="md" class="strap-gradient-bg border-none px-8 rounded-xl" @click="$emit('add-result')">
+        Initialize First Record
       </Button>
     </div>
 
-    <div v-if="results.length === 0" class="text-center py-12">
-      <FileText class="w-12 h-12 text-text-tertiary mx-auto mb-4" />
-      <p class="text-body text-text-secondary mb-2">No results added yet</p>
-      <p class="text-body-small text-text-tertiary">Start tracking your academic performance by adding your first result</p>
-    </div>
+    <div v-else class="space-y-3">
+      <div 
+        v-for="result in results" 
+        :key="result.id"
+        class="group liquid-glass p-5 rounded-[1.5rem] flex flex-wrap md:flex-nowrap items-center gap-6 border-white/40 dark:border-white/5 hover:border-strap-indigo/30 transition-all duration-500"
+      >
+        <!-- Course Meta -->
+        <div class="flex items-center gap-4 flex-1 min-w-[200px]">
+          <div :class="`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white shadow-lg ${getGradeBg(result.grade)}`">
+            {{ result.grade }}
+          </div>
+          <div class="flex flex-col">
+            <h4 class="text-base font-black text-text-main dark:text-white group-hover:text-strap-indigo transition-colors">{{ result.course }}</h4>
+            <span class="text-[10px] font-black uppercase tracking-widest text-text-muted">{{ result.semester }}</span>
+          </div>
+        </div>
 
-    <div v-else class="overflow-x-auto">
-      <table class="w-full">
-        <thead>
-          <tr class="border-b border-border-default">
-            <th class="text-left py-3 px-4 text-body-small font-semibold text-text-secondary">Course</th>
-            <th class="text-left py-3 px-4 text-body-small font-semibold text-text-secondary">Type</th>
-            <th class="text-left py-3 px-4 text-body-small font-semibold text-text-secondary">Score</th>
-            <th class="text-left py-3 px-4 text-body-small font-semibold text-text-secondary">Grade</th>
-            <th class="text-left py-3 px-4 text-body-small font-semibold text-text-secondary">Semester</th>
-            <th class="text-left py-3 px-4 text-body-small font-semibold text-text-secondary">Date</th>
-            <th class="text-right py-3 px-4 text-body-small font-semibold text-text-secondary">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="result in results"
-            :key="result.id"
-            class="border-b border-border-default hover:bg-neutral-gray50 transition-colors"
-          >
-            <td class="py-3 px-4">
-              <p class="text-body font-medium text-text-primary">{{ result.course }}</p>
-            </td>
-            <td class="py-3 px-4">
-              <Badge :variant="getAssessmentBadgeVariant(result.assessmentType)" size="sm">
-                {{ formatAssessmentType(result.assessmentType) }}
-              </Badge>
-            </td>
-            <td class="py-3 px-4">
-              <p class="text-body text-text-primary">{{ result.score }} / {{ result.maxScore }}</p>
-            </td>
-            <td class="py-3 px-4">
-              <span :class="getGradeColor(result.grade)" class="text-body font-semibold">
-                {{ result.grade }}
-              </span>
-            </td>
-            <td class="py-3 px-4">
-              <p class="text-body-small text-text-secondary">{{ result.semester }}</p>
-            </td>
-            <td class="py-3 px-4">
-              <p class="text-body-small text-text-secondary">{{ formatDate(result.date) }}</p>
-            </td>
-            <td class="py-3 px-4">
-              <div class="flex items-center justify-end gap-2">
-                <Button variant="ghost" size="sm" @click="$emit('edit-result', result)">
-                  <Edit :size="16" />
-                </Button>
-                <Button variant="ghost" size="sm" @click="$emit('delete-result', result.id)">
-                  <Trash2 :size="16" />
-                </Button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <!-- Score & Type -->
+        <div class="flex items-center gap-8 px-6 border-x border-white/20 dark:border-white/5">
+          <div class="flex flex-col items-center">
+            <span class="text-[9px] font-black uppercase tracking-widest text-text-muted mb-1">Score</span>
+            <span class="text-sm font-black text-text-main dark:text-white">{{ result.score }} / {{ result.maxScore }}</span>
+          </div>
+          <div class="flex flex-col items-center">
+            <span class="text-[9px] font-black uppercase tracking-widest text-text-muted mb-1">Type</span>
+            <div class="px-3 py-1 rounded-full bg-strap-indigo/10 text-strap-indigo text-[10px] font-black uppercase tracking-widest">
+              {{ result.assessmentType }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Date & Actions -->
+        <div class="flex items-center gap-6 ml-auto">
+          <div class="hidden sm:flex flex-col items-end">
+             <span class="text-[9px] font-black uppercase tracking-widest text-text-muted mb-1">Recorded</span>
+             <span class="text-xs font-bold text-text-main dark:text-white">{{ formatDate(result.date) }}</span>
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <button @click="$emit('edit-result', result)" class="p-2.5 rounded-xl hover:bg-strap-indigo/10 text-text-muted hover:text-strap-indigo transition-all">
+              <Edit :size="18" />
+            </button>
+            <button @click="$emit('delete-result', result.id)" class="p-2.5 rounded-xl hover:bg-red-500/10 text-text-muted hover:text-red-500 transition-all">
+              <Trash2 :size="18" />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
-  </Card>
+  </div>
 </template>
 
 <script setup>
-import Card from '@/Components/Common/Card.vue'
 import Button from '@/Components/Common/Button.vue'
-import Badge from '@/Components/Common/Badge.vue'
-import { Plus, FileText, Edit, Trash2 } from 'lucide-vue-next'
+import { FileText, Edit, Trash2, Plus } from 'lucide-vue-next'
 
 defineProps({
-  results: {
-    type: Array,
-    default: () => []
-  }
+  results: { type: Array, default: () => [] }
 })
 
 defineEmits(['add-result', 'edit-result', 'delete-result'])
 
-const formatAssessmentType = (type) => {
-  const types = {
-    quiz: 'Quiz',
-    midterm: 'Midterm',
-    final: 'Final',
-    assignment: 'Assignment',
-    project: 'Project'
-  }
-  return types[type] || type
-}
-
-const getAssessmentBadgeVariant = (type) => {
-  const variants = {
-    quiz: 'info',
-    midterm: 'warning',
-    final: 'error',
-    assignment: 'success',
-    project: 'info'
-  }
-  return variants[type] || 'info'
-}
-
-const getGradeColor = (grade) => {
-  const gradeNum = parseFloat(grade)
-  if (gradeNum >= 3.7) return 'text-primary-green'
-  if (gradeNum >= 3.0) return 'text-secondary-blue'
-  if (gradeNum >= 2.0) return 'text-accent-orange'
-  return 'text-accent-red'
+const getGradeBg = (grade) => {
+  if (['A+', 'A', 'A-'].includes(grade)) return 'strap-gradient-bg'
+  if (['B+', 'B', 'B-'].includes(grade)) return 'bg-strap-indigo'
+  if (['C+', 'C', 'C-'].includes(grade)) return 'bg-strap-amber text-strap-navy'
+  return 'bg-red-500'
 }
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 </script>
-

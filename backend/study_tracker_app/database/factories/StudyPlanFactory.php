@@ -22,12 +22,18 @@ class StudyPlanFactory extends Factory
      */
     public function definition(): array
     {
-        // Generate dates for the current week
+        // Generate dates for the current week or past
         $startOfWeek = now()->startOfWeek();
         $endOfWeek = now()->endOfWeek();
-        $randomDate = fake()->dateTimeBetween($startOfWeek, $endOfWeek);
-        
         $status = fake()->randomElement(['completed', 'pending', 'in-progress', 'missed']);
+        
+        // If completed, the date must be in the past or today
+        if ($status === 'completed') {
+            $randomDate = fake()->dateTimeBetween($startOfWeek, 'now');
+        } else {
+            $randomDate = fake()->dateTimeBetween($startOfWeek, $endOfWeek);
+        }
+        
         $plannedDuration = fake()->numberBetween(30, 180); // minutes
         
         return [

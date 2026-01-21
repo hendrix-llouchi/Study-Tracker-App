@@ -1,14 +1,14 @@
 <template>
-  <div class="app-layout min-h-screen bg-neutral-gray50">
+  <div class="app-layout min-h-screen bg-[var(--bg-primary)]">
     <Sidebar :is-mobile-menu-open="isMobileMenuOpen" @close-mobile-menu="isMobileMenuOpen = false" />
-    <div class="lg:ml-60">
+    <div class="lg:ml-64">
       <AppHeader
         :user="user"
         :unread-count="unreadCount"
         @logout="handleLogout"
         @toggle-mobile-menu="isMobileMenuOpen = !isMobileMenuOpen"
       />
-      <main class="pt-16 lg:pt-20 px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
+      <main class="pt-24 lg:pt-32 px-6 lg:px-12 py-8">
         <slot />
       </main>
     </div>

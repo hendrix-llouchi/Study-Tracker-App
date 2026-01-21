@@ -23,8 +23,10 @@ class PerformanceController extends Controller
     use ApiResponse;
 
     public function __construct(
-        protected GpaCalculationService $gpaService
-    ) {}
+        protected GpaCalculationService $gpaService,
+        protected \App\Services\SemesterMappingService $semesterService
+    ) {
+    }
 
     /**
      * Get all academic results.
@@ -120,11 +122,11 @@ class PerformanceController extends Controller
         ]);
 
         if (!in_array($extension, ['csv', 'txt', 'pdf'])) {
-             return $this->errorResponse(
-                 "Invalid file type. Only CSV, TXT, and PDF files are allowed. You uploaded a {$extension} file.",
-                 ['uploaded_extension' => $extension, 'allowed_extensions' => ['csv', 'txt', 'pdf']],
-                 422
-             );
+            return $this->errorResponse(
+                "Invalid file type. Only CSV, TXT, and PDF files are allowed. You uploaded a {$extension} file.",
+                ['uploaded_extension' => $extension, 'allowed_extensions' => ['csv', 'txt', 'pdf']],
+                422
+            );
         }
 
         try {
@@ -143,52 +145,55 @@ class PerformanceController extends Controller
                     Log::error('PDF parsing error: ' . $e->getMessage());
                     throw new \Exception('Failed to parse PDF file: ' . $e->getMessage());
                 }
-                
+
                 if (empty(trim($text))) {
                     throw new \Exception('PDF appears to be empty or contains no extractable text. Please ensure the PDF contains readable text.');
                 }
-                
+
                 // Log extracted text for debugging (first 1000 chars)
                 Log::info('PDF extracted text preview:', [
                     'preview' => substr($text, 0, 1000),
                     'total_length' => strlen($text)
                 ]);
-                
+
                 // Convert PDF text to CSV-like format
                 // Try to detect table structure in PDF
                 $lines = explode("\n", $text);
                 $csvContent = [];
                 $potentialTableRows = [];
-                
+
                 // First pass: collect all potential table rows
                 foreach ($lines as $lineNum => $line) {
                     $originalLine = $line;
                     $line = trim($line);
-                    
-                    if (empty($line)) continue;
-                    
+
+                    if (empty($line))
+                        continue;
+
                     // Skip lines that look like headers/footers (all caps, dates, page numbers)
                     if (preg_match('/^(PAGE|DATE|TOTAL|GRAND TOTAL|\d{1,2}\/\d{1,2}\/\d{2,4})/i', $line)) {
                         continue;
                     }
-                    
+
                     // Skip semester/year headers (e.g., "Year 1: Semester 1", "Year 2: Semester 2")
                     if (preg_match('/^Year\s+\d+:\s*Semester\s+\d+/i', $line)) {
                         continue;
                     }
-                    
+
                     // Skip summary rows (e.g., "CWA: 67.00 Total Credits: 21")
-                    if (preg_match('/CWA:\s*\d+\.?\d*\s*Total\s*Credits:/i', $line) ||
+                    if (
+                        preg_match('/CWA:\s*\d+\.?\d*\s*Total\s*Credits:/i', $line) ||
                         preg_match('/^CWA:/i', $line) ||
-                        preg_match('/Total\s*Credits:\s*\d+/i', $line)) {
+                        preg_match('/Total\s*Credits:\s*\d+/i', $line)
+                    ) {
                         continue;
                     }
-                    
+
                     // Skip rows that start with formatting characters (e.g., "l X c c c Code...")
                     if (preg_match('/^[l1]\s+[Xx]\s+[cC]\s+[cC]\s+[cC]/', $line)) {
                         continue;
                     }
-                    
+
                     // Skip header rows that contain column names but no data
                     // Check for patterns like "Code Course Title Credits Mark Grade" or similar
                     $headerKeywords = ['code', 'course', 'title', 'credits', 'mark', 'grade', 'score'];
@@ -202,12 +207,12 @@ class PerformanceController extends Controller
                     if ($headerKeywordCount >= 3 && !preg_match('/\b\d{2,}\b/', $line)) {
                         continue;
                     }
-                    
+
                     // Skip very short lines (likely not table data)
                     if (strlen($line) < 5) {
                         continue;
                     }
-                    
+
                     // Check if line looks like table data
                     $isTableRow = false;
                     $processedLine = null;
@@ -231,9 +236,11 @@ class PerformanceController extends Controller
                     }
                     // Method 4: Line contains numeric patterns that suggest table data
                     // Look for patterns like: text followed by numbers, or numbers separated by spaces
-                    elseif (preg_match('/\b\d+\.?\d*\s+\d+\.?\d*\b/', $line) || 
-                            preg_match('/[A-Z]{2,}\d{3,4}/', $line) || // Course codes like CS101, MATH201
-                            preg_match('/\b\d+\/\d+\b/', $line)) { // Fractions like 85/100
+                    elseif (
+                        preg_match('/\b\d+\.?\d*\s+\d+\.?\d*\b/', $line) ||
+                        preg_match('/[A-Z]{2,}\d{3,4}/', $line) || // Course codes like CS101, MATH201
+                        preg_match('/\b\d+\/\d+\b/', $line)
+                    ) { // Fractions like 85/100
                         // Try to split on single spaces if we detect numeric patterns
                         // But be more careful - only if line has at least 3 "words"
                         $words = preg_split('/\s+/', $line);
@@ -243,33 +250,33 @@ class PerformanceController extends Controller
                         }
                     }
 
-                // For PDFs, always split into words for special format detection
-                if ($isPdf && empty($words)) {
-                    $words = preg_split('/\s+/', $line);
-                }
-
-                // Special handling for the specific PDF format seen in logs:
-                // Pattern: "CS101 Intro to Programming 3 72 B"
-                // Code (1 word) + Name (multiple words) + Credits (1 num) + Score (1 num) + Grade (1 char/word)
-                if ($isPdf && count($words) >= 5) {
-                    $lastIndex = count($words) - 1;
-                    $grade = $words[$lastIndex];
-                    $score = $words[$lastIndex - 1];
-                    $credits = $words[$lastIndex - 2];
-
-                    // Check if last parts match expected pattern (Grade, Score:Number, Credits:Number)
-                    if (is_numeric($score) && is_numeric($credits)) {
-                        $code = $words[0];
-                        $name = implode(' ', array_slice($words, 1, $lastIndex - 3)); // Extract property
-
-                        // Construct a CSV line with explicit comma separators
-                        $processedLine = "{$code},{$name},{$credits},{$score},{$grade}";
-                        $isTableRow = true;
+                    // For PDFs, always split into words for special format detection
+                    if ($isPdf && empty($words)) {
+                        $words = preg_split('/\s+/', $line);
                     }
-                }
 
-                if ($isTableRow && $processedLine) {
-// ...
+                    // Special handling for the specific PDF format seen in logs:
+                    // Pattern: "CS101 Intro to Programming 3 72 B"
+                    // Code (1 word) + Name (multiple words) + Credits (1 num) + Score (1 num) + Grade (1 char/word)
+                    if ($isPdf && count($words) >= 5) {
+                        $lastIndex = count($words) - 1;
+                        $grade = $words[$lastIndex];
+                        $score = $words[$lastIndex - 1];
+                        $credits = $words[$lastIndex - 2];
+
+                        // Check if last parts match expected pattern (Grade, Score:Number, Credits:Number)
+                        if (is_numeric($score) && is_numeric($credits)) {
+                            $code = $words[0];
+                            $name = implode(' ', array_slice($words, 1, $lastIndex - 3)); // Extract property
+
+                            // Construct a CSV line with explicit comma separators
+                            $processedLine = "{$code},{$name},{$credits},{$score},{$grade}";
+                            $isTableRow = true;
+                        }
+                    }
+
+                    if ($isTableRow && $processedLine) {
+                        // ...
                         $potentialTableRows[] = [
                             'line_num' => $lineNum + 1,
                             'original' => $originalLine,
@@ -278,7 +285,7 @@ class PerformanceController extends Controller
                         ];
                     }
                 }
-                
+
                 // Second pass: Filter and validate potential table rows
                 // Group by field count to find the most common structure
                 $fieldCounts = [];
@@ -286,7 +293,7 @@ class PerformanceController extends Controller
                     $count = $row['field_count'];
                     $fieldCounts[$count] = ($fieldCounts[$count] ?? 0) + 1;
                 }
-                
+
                 // Find the most common field count (likely the table structure)
                 $mostCommonFieldCount = null;
                 $maxCount = 0;
@@ -296,7 +303,7 @@ class PerformanceController extends Controller
                         $mostCommonFieldCount = $count;
                     }
                 }
-                
+
                 // If we found a common structure, filter rows to match it (with some tolerance)
                 if ($mostCommonFieldCount !== null) {
                     $tolerance = 1; // Allow ±1 field difference
@@ -311,7 +318,7 @@ class PerformanceController extends Controller
                         $csvContent[] = $row['processed'];
                     }
                 }
-                
+
                 // Log what we extracted
                 Log::info('PDF table extraction results:', [
                     'total_lines_processed' => count($lines),
@@ -321,7 +328,7 @@ class PerformanceController extends Controller
                     'most_common_field_count' => $mostCommonFieldCount,
                     'sample_rows' => array_slice($csvContent, 0, 5)
                 ]);
-                
+
                 if (empty($csvContent)) {
                     // Provide more helpful error message with extracted text sample
                     $sampleText = implode("\n", array_slice($lines, 0, 20));
@@ -333,7 +340,7 @@ class PerformanceController extends Controller
                         'Extracted text sample: ' . substr($sampleText, 0, 500)
                     );
                 }
-                
+
                 // Create a temporary CSV string
                 $csvString = implode("\n", $csvContent);
                 Log::info('Generated CSV content length: ' . strlen($csvString));
@@ -343,7 +350,7 @@ class PerformanceController extends Controller
             } else {
                 $handle = fopen($file->getPathname(), 'r');
             }
-            
+
             if ($handle === false) {
                 throw new \Exception('Unable to open file');
             }
@@ -359,20 +366,20 @@ class PerformanceController extends Controller
                 }
             }
             rewind($handle);
-            
+
             // Count occurrences of common delimiters
             $delimiters = [',', ';', "\t", '|'];
             $delimiterCounts = [];
             foreach ($delimiters as $delim) {
                 $delimiterCounts[$delim] = substr_count($sample, $delim);
             }
-            
+
             // Use the delimiter with the most occurrences (but at least 2 to be valid)
             $maxCount = max($delimiterCounts);
             if ($maxCount >= 2) {
                 $delimiter = array_search($maxCount, $delimiterCounts);
             }
-            
+
             Log::info('Detected CSV delimiter:', ['delimiter' => $delimiter === "\t" ? 'TAB' : $delimiter, 'counts' => $delimiterCounts]);
 
             // Read first row (potential header)
@@ -383,16 +390,16 @@ class PerformanceController extends Controller
 
             // Store current position to rewind if needed
             $headerPosition = ftell($handle);
-            
+
             // Try to determine if first row is header or data
             $isHeaderRow = false;
             $headerMap = [];
-            
+
             // Check if first row looks like headers (contains text keywords, not all numeric)
             $textKeywords = ['course', 'subject', 'code', 'score', 'marks', 'grade', 'assessment', 'type', 'name', 'semester', 'term', 'date'];
             $hasTextKeywords = false;
             $allNumeric = true;
-            
+
             foreach ($firstRow as $col) {
                 $colLower = strtolower(trim($col));
                 foreach ($textKeywords as $keyword) {
@@ -406,9 +413,10 @@ class PerformanceController extends Controller
                     $allNumeric = false;
                 }
             }
-            
-            $isHeaderRow = $hasTextKeywords || (!$allNumeric && count(array_filter($firstRow, function($v) { return !empty(trim($v)); })) >= 3);
-            
+
+            $isHeaderRow = $hasTextKeywords || (!$allNumeric && count(array_filter($firstRow, function ($v) {
+                return !empty(trim($v)); })) >= 3);
+
             if ($isHeaderRow) {
                 $header = $firstRow;
                 Log::info('Detected header row:', ['headers' => $header]);
@@ -424,20 +432,25 @@ class PerformanceController extends Controller
             if ($header) {
                 foreach ($header as $index => $col) {
                     $col = trim($col);
-                    if (empty($col)) continue;
-                    
+                    if (empty($col))
+                        continue;
+
                     $cleanCol = strtolower(str_replace([' ', '-', '_', '.', '(', ')', ':', '/'], '', $col));
-                    
+
                     // Course name variations (check for "Course Title" or similar patterns first)
-                    if (preg_match('/coursetitle|course.*title|title/i', $col) && 
-                        !preg_match('/code|id|number/i', $col)) {
+                    if (
+                        preg_match('/coursetitle|course.*title|title/i', $col) &&
+                        !preg_match('/code|id|number/i', $col)
+                    ) {
                         if (!isset($headerMap['course_name'])) {
                             $headerMap['course_name'] = $index;
                         }
                     }
                     // Course name variations (most flexible - but not code)
-                    elseif (preg_match('/course|subject|module|unit/i', $col) && 
-                        !preg_match('/code|id|number|title/i', $col)) {
+                    elseif (
+                        preg_match('/course|subject|module|unit/i', $col) &&
+                        !preg_match('/code|id|number|title/i', $col)
+                    ) {
                         if (!isset($headerMap['course_name'])) {
                             $headerMap['course_name'] = $index;
                         }
@@ -447,8 +460,10 @@ class PerformanceController extends Controller
                         $headerMap['course_code'] = $index;
                     }
                     // Score variations
-                    elseif (preg_match('/score|marks?|obtained|points?|grade.*score/i', $col) && 
-                            !preg_match('/max|total|out.*of|maximum/i', $col)) {
+                    elseif (
+                        preg_match('/score|marks?|obtained|points?|grade.*score/i', $col) &&
+                        !preg_match('/max|total|out.*of|maximum/i', $col)
+                    ) {
                         if (!isset($headerMap['score'])) {
                             $headerMap['score'] = $index;
                         }
@@ -483,18 +498,20 @@ class PerformanceController extends Controller
                     }
                 }
             }
-            
+
             // If headers weren't found or first row was data, try to infer from data patterns
             // Note: assessment_type is optional, will default to 'assignment' if not found
-            if ((!isset($headerMap['course_name']) && !isset($headerMap['course_code'])) ||
+            if (
+                (!isset($headerMap['course_name']) && !isset($headerMap['course_code'])) ||
                 !isset($headerMap['score']) ||
-                !isset($headerMap['max_score'])) {
-                
+                !isset($headerMap['max_score'])
+            ) {
+
                 Log::info('Header mapping incomplete, attempting to infer from data patterns', [
                     'found_mappings' => $headerMap,
                     'first_row' => $firstRow
                 ]);
-                
+
                 // Rewind to start and read a few rows to analyze
                 rewind($handle);
                 $sampleRows = [];
@@ -504,10 +521,10 @@ class PerformanceController extends Controller
                         $sampleRows[] = $row;
                     }
                 }
-                
+
                 if (count($sampleRows) > 0) {
                     $columnCount = count($sampleRows[0]);
-                    
+
                     // First pass: Look for "85/100" pattern (score/max_score in one column)
                     for ($colIndex = 0; $colIndex < $columnCount; $colIndex++) {
                         $sampleValue = trim($sampleRows[0][$colIndex] ?? '');
@@ -523,28 +540,31 @@ class PerformanceController extends Controller
                             }
                         }
                     }
-                    
+
                     // Second pass: Analyze each column position for other patterns
                     for ($colIndex = 0; $colIndex < $columnCount; $colIndex++) {
                         $columnValues = array_filter(array_column($sampleRows, $colIndex));
-                        if (empty($columnValues)) continue;
-                        
+                        if (empty($columnValues))
+                            continue;
+
                         $sampleValue = trim($columnValues[0] ?? '');
                         $isNumeric = is_numeric($sampleValue);
                         $isCourseCode = preg_match('/^[A-Z]{2,}\d{3,4}$/i', $sampleValue);
-                        $isCourseName = !$isNumeric && !$isCourseCode && strlen($sampleValue) > 3 && 
-                                        preg_match('/[A-Za-z]{3,}/', $sampleValue);
-                        $hasSlash = strpos($sampleValue, '/') !== false && 
-                                   !isset($headerMap['score']); // Already handled above
-                        
+                        $isCourseName = !$isNumeric && !$isCourseCode && strlen($sampleValue) > 3 &&
+                            preg_match('/[A-Za-z]{3,}/', $sampleValue);
+                        $hasSlash = strpos($sampleValue, '/') !== false &&
+                            !isset($headerMap['score']); // Already handled above
+
                         // Infer course code (alphanumeric codes like CS101, MATH201)
                         if (!isset($headerMap['course_code']) && $isCourseCode) {
                             $headerMap['course_code'] = $colIndex;
                             Log::info("Inferred course_code at column $colIndex");
                         }
                         // Infer course name (text that's not a code and not numeric)
-                        elseif (!isset($headerMap['course_name']) && $isCourseName && 
-                                !isset($headerMap['course_code'])) {
+                        elseif (
+                            !isset($headerMap['course_name']) && $isCourseName &&
+                            !isset($headerMap['course_code'])
+                        ) {
                             $headerMap['course_name'] = $colIndex;
                             Log::info("Inferred course_name at column $colIndex");
                         }
@@ -556,7 +576,7 @@ class PerformanceController extends Controller
                                 $nextValue = trim($sampleRows[0][$colIndex + 1] ?? '');
                                 $nextIsNumeric = is_numeric($nextValue);
                             }
-                            
+
                             // If next column is also numeric, this is likely score and next is max_score
                             if ($nextIsNumeric && !isset($headerMap['max_score'])) {
                                 $headerMap['score'] = $colIndex;
@@ -578,9 +598,23 @@ class PerformanceController extends Controller
                         if (!isset($headerMap['assessment_type'])) {
                             $lowerValue = strtolower($sampleValue);
                             $assessmentKeywords = [
-                                'quiz', 'midterm', 'mid-term', 'mid term', 'final', 'assignment', 
-                                'project', 'exam', 'test', 'lab', 'laboratory', 'homework', 'hw',
-                                'assignment', 'essay', 'presentation', 'report'
+                                'quiz',
+                                'midterm',
+                                'mid-term',
+                                'mid term',
+                                'final',
+                                'assignment',
+                                'project',
+                                'exam',
+                                'test',
+                                'lab',
+                                'laboratory',
+                                'homework',
+                                'hw',
+                                'assignment',
+                                'essay',
+                                'presentation',
+                                'report'
                             ];
                             foreach ($assessmentKeywords as $keyword) {
                                 if (strpos($lowerValue, $keyword) !== false) {
@@ -592,7 +626,7 @@ class PerformanceController extends Controller
                         }
                     }
                 }
-                
+
                 // Rewind again to start processing
                 rewind($handle);
                 // Skip header row if we had one
@@ -615,15 +649,18 @@ class PerformanceController extends Controller
             ]);
 
             // Check required mappings (assessment_type and max_score are optional)
-            if ((!isset($headerMap['course_name']) && !isset($headerMap['course_code'])) ||
-                !isset($headerMap['score'])) {
-                
+            if (
+                (!isset($headerMap['course_name']) && !isset($headerMap['course_code'])) ||
+                !isset($headerMap['score'])
+            ) {
+
                 $missing = [];
                 if (!isset($headerMap['course_name']) && !isset($headerMap['course_code'])) {
                     $missing[] = 'course_name/code';
                 }
-                if (!isset($headerMap['score'])) $missing[] = 'score';
-                
+                if (!isset($headerMap['score']))
+                    $missing[] = 'score';
+
                 // Note: assessment_type and max_score are optional
                 if (!isset($headerMap['assessment_type'])) {
                     Log::info('assessment_type column not found, will default to "assignment" for all rows');
@@ -631,7 +668,7 @@ class PerformanceController extends Controller
                 if (!isset($headerMap['max_score'])) {
                     Log::info('max_score column not found, will default to 100 for all rows');
                 }
-                
+
                 // Log detailed information for debugging
                 Log::error('Missing required columns in bulk upload', [
                     'missing' => $missing,
@@ -640,7 +677,7 @@ class PerformanceController extends Controller
                     'file_extension' => $extension,
                     'first_row_sample' => $firstRow ?? null
                 ]);
-                
+
                 return $this->errorResponse(
                     'Missing required columns: ' . implode(', ', $missing) . '. ' .
                     'Found columns: ' . ($header ? implode(', ', $header) : 'none detected') . '. ' .
@@ -656,7 +693,7 @@ class PerformanceController extends Controller
                     422
                 );
             }
-            
+
             // Log if optional fields are missing (will use defaults)
             if (!isset($headerMap['assessment_type'])) {
                 Log::info('assessment_type column not found in CSV, will default to "assignment" for all imported rows');
@@ -674,30 +711,31 @@ class PerformanceController extends Controller
                 $rowNumber++;
 
                 // Skip empty rows
-                if (empty(array_filter($row))) continue;
+                if (empty(array_filter($row)))
+                    continue;
 
                 $rowData = [];
                 // Extract data using map
                 foreach ($headerMap as $key => $index) {
                     $rowData[$key] = isset($row[$index]) ? trim($row[$index]) : null;
                 }
-                
+
                 // Handle case where course name might be split across multiple columns
                 // This happens when PDF parsing splits "Intro to Programming" into separate columns
                 $startIndex = null;
                 $endIndex = null;
-                
+
                 // Determine where to start looking for course name
                 if (isset($headerMap['course_code'])) {
                     $startIndex = $headerMap['course_code'] + 1;
                 } elseif (isset($headerMap['course_name'])) {
                     $startIndex = $headerMap['course_name'];
                 }
-                
+
                 // If we have a course_code but course_name is missing or very short, try to combine
                 if (!empty($rowData['course_code']) && (empty($rowData['course_name']) || strlen($rowData['course_name']) < 5)) {
                     $combinedName = [];
-                    
+
                     // Look for consecutive text columns after the course code
                     for ($i = $startIndex ?? 0; $i < count($row); $i++) {
                         // Skip if this column is already mapped to something important
@@ -708,8 +746,9 @@ class PerformanceController extends Controller
                                 break;
                             }
                         }
-                        if ($isMapped) break;
-                        
+                        if ($isMapped)
+                            break;
+
                         $cellValue = trim($row[$i] ?? '');
                         // If it's numeric or empty, stop combining
                         if (empty($cellValue) || is_numeric($cellValue)) {
@@ -722,7 +761,7 @@ class PerformanceController extends Controller
                             break;
                         }
                     }
-                    
+
                     if (!empty($combinedName)) {
                         $rowData['course_name'] = implode(' ', $combinedName);
                         Log::info("Combined course name from multiple columns: {$rowData['course_name']}");
@@ -732,7 +771,7 @@ class PerformanceController extends Controller
                 elseif (!empty($rowData['course_name']) && isset($headerMap['course_name']) && strlen($rowData['course_name']) < 15) {
                     $courseNameIndex = $headerMap['course_name'];
                     $combinedName = [$rowData['course_name']];
-                    
+
                     // Look for additional text columns after the mapped course_name
                     for ($i = $courseNameIndex + 1; $i < count($row); $i++) {
                         // Skip if this column is already mapped to something important
@@ -743,8 +782,9 @@ class PerformanceController extends Controller
                                 break;
                             }
                         }
-                        if ($isMapped) break;
-                        
+                        if ($isMapped)
+                            break;
+
                         $cellValue = trim($row[$i] ?? '');
                         // If it's numeric or empty, stop combining
                         if (empty($cellValue) || is_numeric($cellValue)) {
@@ -757,7 +797,7 @@ class PerformanceController extends Controller
                             break;
                         }
                     }
-                    
+
                     if (count($combinedName) > 1) {
                         $rowData['course_name'] = implode(' ', $combinedName);
                         Log::info("Extended course name from multiple columns: {$rowData['course_name']}");
@@ -765,9 +805,11 @@ class PerformanceController extends Controller
                 }
 
                 // Handle case where score and max_score are in the same column (e.g., "85/100")
-                if (isset($headerMap['score']) && isset($headerMap['max_score']) && 
-                    $headerMap['score'] === $headerMap['max_score'] && 
-                    !empty($rowData['score'])) {
+                if (
+                    isset($headerMap['score']) && isset($headerMap['max_score']) &&
+                    $headerMap['score'] === $headerMap['max_score'] &&
+                    !empty($rowData['score'])
+                ) {
                     $scoreValue = $rowData['score'];
                     if (preg_match('/^(\d+\.?\d*)\s*\/\s*(\d+\.?\d*)$/', $scoreValue, $matches)) {
                         $rowData['score'] = $matches[1];
@@ -828,7 +870,7 @@ class PerformanceController extends Controller
                     $errors[] = "Row {$rowNumber}: Score is required and cannot be empty";
                     continue;
                 }
-                
+
                 // Convert score and max_score to numeric if they're strings
                 if (isset($rowData['score']) && !is_numeric($rowData['score'])) {
                     $rowData['score'] = filter_var($rowData['score'], FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
@@ -836,13 +878,13 @@ class PerformanceController extends Controller
                 if (isset($rowData['max_score']) && !is_numeric($rowData['max_score'])) {
                     $rowData['max_score'] = filter_var($rowData['max_score'], FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
                 }
-                
+
                 // Default max_score to 100 if not provided
                 if (empty($rowData['max_score']) || !is_numeric($rowData['max_score'])) {
                     $rowData['max_score'] = 100;
                     Log::info("Row {$rowNumber}: max_score not found or invalid, defaulting to 100");
                 }
-                
+
                 if (!is_numeric($rowData['score'])) {
                     $errors[] = "Row {$rowNumber}: Score must be numeric (found: score='{$rowData['score']}')";
                     continue;
@@ -851,7 +893,7 @@ class PerformanceController extends Controller
                 // Default values
                 $semester = !empty($rowData['semester']) ? $rowData['semester'] : 'Unknown';
                 $date = !empty($rowData['date']) ? date('Y-m-d', strtotime($rowData['date'])) : now()->format('Y-m-d');
-                
+
                 // Validate assessment_type
                 $assessmentType = $rowData['assessment_type'] ?? 'assignment';
                 $validAssessmentTypes = ['quiz', 'midterm', 'final', 'assignment', 'project', 'exam', 'test', 'lab'];
@@ -899,12 +941,12 @@ class PerformanceController extends Controller
                     'imported_count' => $importedCount
                 ]);
                 return $this->errorResponse(
-                    'Bulk upload failed due to validation errors', 
+                    'Bulk upload failed due to validation errors',
                     [
                         'row_errors' => $errors,
                         'total_errors' => count($errors),
                         'successful_imports' => $importedCount
-                    ], 
+                    ],
                     422
                 );
             }
@@ -925,16 +967,16 @@ class PerformanceController extends Controller
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
             ]);
-            
+
             // Return more detailed error information
             $errorData = [
                 'exception_message' => $e->getMessage(),
                 'exception_type' => get_class($e)
             ];
-            
+
             return $this->errorResponse(
-                'Bulk upload failed: ' . $e->getMessage(), 
-                $errorData, 
+                'Bulk upload failed: ' . $e->getMessage(),
+                $errorData,
                 422
             );
         }
@@ -956,7 +998,7 @@ class PerformanceController extends Controller
 
         // Get files - Laravel handles pdf_files[] array notation automatically
         $files = $request->file('pdf_files');
-        
+
         // Handle case where files might be sent without array notation or as single file
         if (!$files) {
             // Try alternative: check if files are sent as pdf_files[0], pdf_files[1], etc.
@@ -1023,7 +1065,7 @@ class PerformanceController extends Controller
             }
 
             $extension = strtolower($file->getClientOriginalExtension());
-            
+
             // Check file extension
             if ($extension !== 'pdf') {
                 $fileErrors[] = "File " . ($index + 1) . " ({$file->getClientOriginalName()}): Must be a PDF file (found extension: {$extension})";
@@ -1258,7 +1300,7 @@ class PerformanceController extends Controller
         }
 
         $files = $request->file('pdf_files');
-        
+
         // Convert to array if single file
         if (!is_array($files)) {
             $files = [$files];
@@ -1301,10 +1343,10 @@ class PerformanceController extends Controller
 
                     // Extract semester using RegEx
                     $semester = $this->extractSemester($text);
-                    
+
                     // Extract GPA values using RegEx
                     $gpaValues = $this->extractGpaValues($text);
-                    
+
                     // Extract course results using RegEx
                     $courseResults = $this->extractCourseResults($text);
 
@@ -1405,7 +1447,7 @@ class PerformanceController extends Controller
                 'processed' => $processedCount,
                 'errors' => $errors,
                 'total_files' => count($files),
-                'results' => array_map(function($r) {
+                'results' => array_map(function ($r) {
                     return [
                         'id' => $r->id,
                         'course_id' => $r->course_id,
@@ -1435,7 +1477,7 @@ class PerformanceController extends Controller
     }
 
     /**
-     * Extract semester from PDF text using RegEx.
+     * Extract semester from PDF text using RegEx and standardize it.
      */
     private function extractSemester(string $text): ?string
     {
@@ -1451,23 +1493,13 @@ class PerformanceController extends Controller
             '/(Fall|Spring|Summer|Winter)\/?(\d{4})/i',
             // S1 2024, S2 2024
             '/S(\d+)\s+(\d{4})/i',
+            // Term 1, Term 2
+            '/Term\s+(\d+)/i',
         ];
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $text, $matches)) {
-                if (count($matches) >= 3) {
-                    // Format: "Fall 2024" or "2024 Fall"
-                    if (preg_match('/^\d{4}$/', $matches[1])) {
-                        return $matches[2] . ' ' . ucfirst(strtolower($matches[1]));
-                    } else {
-                        return ucfirst(strtolower($matches[1])) . ' ' . $matches[2];
-                    }
-                } elseif (count($matches) >= 2) {
-                    // Semester number format
-                    if (preg_match('/Semester\s+(\d+)/i', $matches[0], $semMatch)) {
-                        return 'Semester ' . $semMatch[1] . ' ' . ($matches[2] ?? date('Y'));
-                    }
-                }
+                return $this->semesterService->standardize($matches[0]);
             }
         }
 
@@ -1513,7 +1545,8 @@ class PerformanceController extends Controller
 
         foreach ($lines as $line) {
             $line = trim($line);
-            if (empty($line)) continue;
+            if (empty($line))
+                continue;
 
             // Pattern 1: Course code, name, credits, score, grade
             // Example: "CS101 Intro to Programming 3 72 B"
